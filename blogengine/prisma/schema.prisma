@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  role         String    @default("ADMIN")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  onboardedAt  DateTime?
+  articles     Article[]
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Site {
+  id             String          @id @default(cuid())
+  name           String
+  slug           String          @unique
+  repoOwner      String          @default("angelo222ange")
+  repoName       String
+  domain         String?
+  theme          String          @default("LOCAL_SERVICE")
+  city           String?
+  department     String?
+  blogPattern    String
+  blogBasePath   String          @default("/blog")
+  contentDir     String          @default("content/blog")
+  imageDir       String          @default("public/images/blog")
+  deployScript   String?
+  vpsPath        String?
+  isActive       Boolean         @default(true)
+  adapterConfig  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  githubToken    String?
+  notifyEmail    String?
+  sshHost        String?
+  sshPort        Int?            @default(22)
+  sshPrivateKey  String?
+  sshUser        String?
+  articles       Article[]
+  crawlSnapshots CrawlSnapshot[]
+  schedules      Schedule[]
+  siteImages     SiteImage[]
+  socialAccounts SocialAccount[]
+  socialConfig   SocialConfig?
+  socialPosts    SocialPost[]    @relation("SiteSocialPosts")
+}
+
+model SiteImage {
+  id          String   @id @default(cuid())
+  siteId      String
+  url         String
+  alt         String?
+  category    String   @default("general")
+  description String?
+  width       Int?
+  height      Int?
+  isUsable    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, url])
+}
+
+model Article {
+  id              String       @id @default(cuid())
+  siteId          String
+  slug            String
+  title           String
+  metaTitle       String
+  metaDescription String
+  content         String
+  status          String       @default("DRAFT")
+  articleType     String       @default("evergreen")
+  generatedBy     String?
+  promptUsed      String?
+  keywords        String       @default("[]")
+  category        String?
+  readTime        String?
+  heroImage       String?
+  heroImageAlt    String?
+  imageUrls       String       @default("[]")
+  scheduledFor    DateTime?
+  publishedAt     DateTime?
+  publishedBy     String?
+  gitCommitSha    String?
+  deployedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  user            User?        @relation(fields: [publishedBy], references: [id])
+  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  socialPosts     SocialPost[]
+
+  @@unique([siteId, slug])
+}
+
+model Schedule {
+  id                     String    @id @default(cuid())
+  siteId                 String
+  cronExpr               String
+  timezone               String    @default("Europe/Paris")
+  isActive               Boolean   @default(true)
+  postTime               String    @default("08:00")
+  activeDays             String    @default("[1,2,3,4,5]")
+  evergreenPerDay        Int       @default(1)
+  newsPerWeek            Int       @default(1)
+  autoApprove            Boolean   @default(false)
+  lastRunAt              DateTime?
+  nextRunAt              DateTime?
+  lastGeneratedAt        DateTime?
+  articlesGeneratedToday Int       @default(0)
+  newsGeneratedThisWeek  Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  site                   Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}
+
+model CrawlSnapshot {
+  id               String   @id @default(cuid())
+  siteId           String
+  existingArticles String   @default("[]")
+  topicsCovered    String   @default("[]")
+  topicsGaps       String   @default("[]")
+  siteConfig       String?
+  crawledAt        DateTime @default(now())
+  site             Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}
+
+model JobLog {
+  id          String    @id @default(cuid())
+  jobType     String
+  siteId      String?
+  articleId   String?
+  status      String
+  message     String?
+  metadata    String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+}
+
+model SocialAccount {
+  id             String       @id @default(cuid())
+  siteId         String
+  platform       String
+  platformUserId String?
+  accountName    String?
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scope          String?
+  metadata       String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  site           Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  posts          SocialPost[]
+
+  @@unique([siteId, platform, platformUserId])
+}
+
+model SocialPost {
+  id              String        @id @default(cuid())
+  articleId       String?
+  siteId          String?
+  socialAccountId String
+  platform        String
+  content         String
+  mediaUrls       String        @default("[]")
+  hashtags        String        @default("[]")
+  status          String        @default("DRAFT")
+  platformPostId  String?
+  platformUrl     String?
+  publishedAt     DateTime?
+  scheduledFor    DateTime?
+  errorMessage    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  carouselData    String?
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  site            Site?         @relation("SiteSocialPosts", fields: [siteId], references: [id], onDelete: Cascade)
+  article         Article?      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model SocialConfig {
+  id              String   @id @default(cuid())
+  siteId          String   @unique
+  autoPublish     Boolean  @default(false)
+  defaultHashtags String   @default("[]")
+  postsPerDay     Int      @default(1)
+  postSlots       String   @default("[\"10:00\"]")
+  slotModes       String   @default("[\"stock\"]")
+  activeDays      String   @default("[1,2,3,4,5]")
+  dayModes        String   @default("{}")
+  timezone        String   @default("Europe/Paris")
+  activePlatforms String   @default("[\"facebook\",\"instagram\",\"linkedin\",\"twitter\",\"pinterest\"]")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}

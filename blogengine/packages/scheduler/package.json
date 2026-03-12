@@ -1,0 +1,19 @@
+{
+  "name": "@blogengine/scheduler",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@blogengine/core": "*",
+    "node-cron": "^4.2.1"
+  },
+  "devDependencies": {
+    "@blogengine/typescript-config": "*",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "5.9.2"
+  }
+}

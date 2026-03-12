@@ -1,0 +1,19 @@
+{
+  "name": "@blogengine/social",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@blogengine/core": "*",
+    "openai": "^4.77.0"
+  },
+  "devDependencies": {
+    "@blogengine/typescript-config": "*",
+    "@types/node": "^20.10.0",
+    "typescript": "5.9.2"
+  }
+}
