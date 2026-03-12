@@ -56,6 +56,7 @@ async function getAuthToken(): Promise<string> {
       "Content-Type": "application/json",
       "X-Scheduler-Secret": schedulerSecret,
     },
+    body: JSON.stringify({}),
   });
 
   if (!res.ok) {
@@ -70,7 +71,7 @@ async function getAuthToken(): Promise<string> {
   return authToken;
 }
 
-async function triggerGeneration(siteId: string, siteName: string): Promise<boolean> {
+async function triggerGeneration(siteId: string, siteName: string): Promise<string | null> {
   try {
     const token = await getAuthToken();
 
@@ -89,15 +90,79 @@ async function triggerGeneration(siteId: string, siteName: string): Promise<bool
     if (!res.ok) {
       const err = await res.text().catch(() => "unknown");
       console.error(`[scheduler] Generation failed for ${siteName}: ${err.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await res.json() as any;
+    console.log(`[scheduler] Article generated for ${siteName}: "${data.title || data.slug || "ok"}"`);
+    return data.id || null;
+  } catch (err: any) {
+    console.error(`[scheduler] Error generating for ${siteName}: ${err.message}`);
+    return null;
+  }
+}
+
+async function triggerPublishPipeline(siteId: string, articleId: string): Promise<boolean> {
+  try {
+    const token = await getAuthToken();
+
+    console.log(`[scheduler] Publishing article ${articleId}...`);
+    const pubRes = await fetch(`http://localhost:${apiPort}/api/publish/${articleId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `token=${token}` },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!pubRes.ok) {
+      const err = await pubRes.text().catch(() => "unknown");
+      console.error(`[scheduler] Publish failed: ${err.slice(0, 200)}`);
       return false;
     }
 
-    const data = await res.json();
-    console.log(`[scheduler] Article generated for ${siteName}: "${(data as any).title || (data as any).slug || "ok"}"`);
+    console.log(`[scheduler] Deploying site ${siteId}...`);
+    const deployRes = await fetch(`http://localhost:${apiPort}/api/publish/deploy/${siteId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `token=${token}` },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(120000),
+    });
+
+    if (!deployRes.ok) {
+      const err = await deployRes.text().catch(() => "unknown");
+      console.error(`[scheduler] Deploy failed: ${err.slice(0, 200)}`);
+      return false;
+    }
+
+    console.log(`[scheduler] Publish + deploy complete for article ${articleId}`);
     return true;
   } catch (err: any) {
-    console.error(`[scheduler] Error generating for ${siteName}: ${err.message}`);
+    console.error(`[scheduler] Publish pipeline error: ${err.message}`);
     return false;
+  }
+}
+
+async function triggerSocialPipeline(articleId: string): Promise<void> {
+  try {
+    const token = await getAuthToken();
+
+    console.log(`[scheduler] Generating social posts for article ${articleId}...`);
+    const res = await fetch(`http://localhost:${apiPort}/api/social-posts/generate/${articleId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `token=${token}` },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "unknown");
+      console.error(`[scheduler] Social generation failed: ${err.slice(0, 200)}`);
+      return;
+    }
+
+    console.log(`[scheduler] Social posts generated for article ${articleId}`);
+  } catch (err: any) {
+    console.error(`[scheduler] Social pipeline error: ${err.message}`);
   }
 }
 
@@ -144,13 +209,17 @@ async function checkSchedules(): Promise<void> {
       const activeDays: number[] = Array.isArray(schedData.activeDays)
         ? schedData.activeDays
         : JSON.parse(schedData.activeDays || "[]");
+      const dayTimes: Record<string, string> = schedData.dayTimes && typeof schedData.dayTimes === "object"
+        ? schedData.dayTimes
+        : {};
       const postTime: string = schedData.postTime || "08:00";
+      const todayTime: string = dayTimes[String(currentDay)] || postTime;
 
       // Check if today is an active day
       if (!activeDays.includes(currentDay)) continue;
 
       // Check if current time matches (within 1 minute window)
-      if (currentTimeStr !== postTime) continue;
+      if (currentTimeStr !== todayTime) continue;
 
       // Check if already ran today
       const lastRun = schedData.lastRunAt ? new Date(schedData.lastRunAt) : null;
@@ -170,12 +239,19 @@ async function checkSchedules(): Promise<void> {
       console.log(`[scheduler] Time to generate for ${site.name} (${postTime}, day ${currentDay})`);
 
       // Trigger generation
-      const success = await triggerGeneration(site.id, site.name);
+      const articleId = await triggerGeneration(site.id, site.name);
 
-      if (success) {
+      if (articleId) {
+        // If autoApprove is on, trigger publish + deploy + social
+        if (schedData.autoApprove && articleId) {
+          await triggerPublishPipeline(site.id, articleId);
+          await triggerSocialPipeline(articleId);
+        }
+
         // Update schedule tracking via PUT
         const nextDay = findNextActiveDay(activeDays, currentDay);
-        const nextRunAt = computeNextRunAt(postTime, nextDay, schedData.timezone || "Europe/Paris");
+        const nextDayTime = dayTimes[String(nextDay)] || postTime;
+        const nextRunAt = computeNextRunAt(nextDayTime, nextDay, schedData.timezone || "Europe/Paris");
 
         await fetch(`http://localhost:${apiPort}/api/sites/${site.id}/schedule`, {
           method: "PUT",

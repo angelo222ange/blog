@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../../../lib/use-auth";
-import { getSite, generateArticle, getSchedule, updateSchedule, logout } from "../../../lib/api";
+import { getSite, generateArticle, getSchedule, updateSchedule, getPublishConfig, updatePublishConfig, logout } from "../../../lib/api";
 
 const BADGE_MAP: Record<string, string> = {
   REVIEW: "badge-review", APPROVED: "badge-approved", PUBLISHED: "badge-published",
@@ -76,6 +76,8 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
   const [activeDays, setActiveDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [evergreenPerDay, setEvergreenPerDay] = useState(1);
   const [newsPerWeek, setNewsPerWeek] = useState(3);
+  const [dayTimes, setDayTimes] = useState<Record<string, string>>({});
+  const [perDayMode, setPerDayMode] = useState(false);
 
   useEffect(() => {
     getSchedule(siteId)
@@ -85,6 +87,9 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
         setActiveDays(data.activeDays ?? [1, 2, 3, 4, 5]);
         setEvergreenPerDay(data.evergreenPerDay ?? 1);
         setNewsPerWeek(data.newsPerWeek ?? 3);
+        const dt = data.dayTimes ?? {};
+        setDayTimes(dt);
+        setPerDayMode(Object.keys(dt).length > 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -96,11 +101,12 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
       await updateSchedule(siteId, {
         postTime, activeDays, evergreenPerDay, newsPerWeek, autoApprove,
         isActive: true, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        dayTimes: perDayMode ? dayTimes : {},
       });
       setSaved(true); setTimeout(() => setSaved(false), 2500);
     } catch (err: any) { alert(err.message || "Erreur"); }
     finally { setSaving(false); }
-  }, [siteId, postTime, activeDays, evergreenPerDay, newsPerWeek, autoApprove]);
+  }, [siteId, postTime, activeDays, evergreenPerDay, newsPerWeek, autoApprove, dayTimes, perDayMode]);
 
   const toggleDay = (day: number) => {
     setActiveDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort());
@@ -154,7 +160,30 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Heure de publication</label>
             <input type="time" value={postTime} onChange={(e) => setPostTime(e.target.value)} className="input w-auto" />
+            <label className="flex items-center gap-2 mt-3 cursor-pointer">
+              <input type="checkbox" checked={perDayMode} onChange={(e) => setPerDayMode(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              <span className="text-xs text-gray-600 font-medium">Heure differente par jour</span>
+            </label>
           </div>
+          {perDayMode && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wider">Heures par jour</label>
+              <div className="space-y-2">
+                {activeDays.sort((a, b) => a - b).map((dayNum) => (
+                  <div key={dayNum} className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-gray-700 w-10">{DAY_LABELS[dayNum - 1]}</span>
+                    <input
+                      type="time"
+                      value={dayTimes[String(dayNum)] || postTime}
+                      onChange={(e) => setDayTimes((prev) => ({ ...prev, [String(dayNum)]: e.target.value }))}
+                      className="input w-auto"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wider">Jours actifs</label>
             <div className="flex flex-wrap gap-2">
@@ -194,8 +223,221 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
   );
 }
 
+function PublishConfigSection({ siteId }: { siteId: string }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [config, setConfig] = useState<any>({});
+  const [githubToken, setGithubToken] = useState("");
+  const [sshHost, setSshHost] = useState("");
+  const [sshUser, setSshUser] = useState("deploy");
+  const [sshPort, setSshPort] = useState(22);
+  const [sshPrivateKey, setSshPrivateKey] = useState("");
+  const [vpsPath, setVpsPath] = useState("");
+  const [deployScript, setDeployScript] = useState("");
+  const [notifyEmail, setNotifyEmail] = useState("");
+
+  useEffect(() => {
+    getPublishConfig(siteId)
+      .then((data) => {
+        setConfig(data);
+        setSshHost(data.sshHost || "");
+        setSshUser(data.sshUser || "deploy");
+        setSshPort(data.sshPort || 22);
+        setVpsPath(data.vpsPath || "");
+        setDeployScript(data.deployScript || "");
+        setNotifyEmail(data.notifyEmail || "");
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [siteId]);
+
+  const handleSave = async () => {
+    setSaving(true); setSaved(false);
+    try {
+      const data: any = {
+        sshHost: sshHost || undefined,
+        sshUser: sshUser || undefined,
+        sshPort,
+        vpsPath: vpsPath || undefined,
+        deployScript: deployScript || undefined,
+        notifyEmail: notifyEmail || undefined,
+      };
+      if (githubToken) data.githubToken = githubToken;
+      if (sshPrivateKey) data.sshPrivateKey = sshPrivateKey;
+      await updatePublishConfig(siteId, data);
+      setConfig((prev: any) => ({
+        ...prev,
+        hasGithubToken: githubToken ? true : prev.hasGithubToken,
+        hasSshKey: sshPrivateKey ? true : prev.hasSshKey,
+        sshHost, sshUser, sshPort, vpsPath, deployScript, notifyEmail,
+      }));
+      setGithubToken("");
+      setSshPrivateKey("");
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) { alert(err.message || "Erreur"); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) {
+    return (
+      <div className="card p-6">
+        <div className="flex items-center gap-3">
+          <div className="loader-orbit" style={{ width: 20, height: 20 }} />
+          <span className="text-sm text-gray-500">Chargement...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const hasGitHub = config.hasGithubToken;
+  const hasSSH = config.hasSshKey && config.sshHost;
+
+  return (
+    <div className="card p-4 md:p-6 animate-fade-in">
+      <button onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full text-left">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Configuration publication</h3>
+          <p className="text-sm text-gray-500 mt-0.5">GitHub, VPS, notifications</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${hasGitHub ? "bg-emerald-500" : "bg-gray-300"}`} />
+            <span className="text-xs text-gray-500 font-medium">GitHub</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${hasSSH ? "bg-emerald-500" : "bg-gray-300"}`} />
+            <span className="text-xs text-gray-500 font-medium">VPS</span>
+          </div>
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="mt-6 space-y-6 animate-fade-in">
+          {/* GitHub */}
+          <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-900">GitHub</p>
+              {hasGitHub && <span className="text-xs text-emerald-600 font-semibold">Connecte</span>}
+            </div>
+            {hasGitHub ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex-1">
+                  <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-emerald-700 font-medium">GitHub connecte — acces repo OK</span>
+                </div>
+                <a href={`/api/publish/github/authorize?siteId=${siteId}`}
+                  className="text-xs text-gray-500 hover:text-blue-600 font-medium transition-colors whitespace-nowrap">
+                  Reconnecter
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <a href={`/api/publish/github/authorize?siteId=${siteId}`}
+                  className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                  </svg>
+                  Connecter GitHub
+                </a>
+                <p className="text-xs text-gray-400">Autorisez Zuply a publier des articles sur vos repos GitHub.</p>
+                <details className="group">
+                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 font-medium">
+                    Ou entrer un token manuellement
+                  </summary>
+                  <div className="mt-2">
+                    <input type="password" value={githubToken} onChange={(e) => setGithubToken(e.target.value)}
+                      placeholder="ghp_xxxxxxxxxxxx"
+                      className="input w-full font-mono text-sm" />
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+
+          {/* VPS / SSH */}
+          <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-900">Deploiement VPS</p>
+              {hasSSH && <span className="text-xs text-emerald-600 font-semibold">SSH configure</span>}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Host SSH</label>
+                <input type="text" value={sshHost} onChange={(e) => setSshHost(e.target.value)}
+                  placeholder="123.45.67.89" className="input w-full font-mono text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">User</label>
+                  <input type="text" value={sshUser} onChange={(e) => setSshUser(e.target.value)}
+                    placeholder="deploy" className="input w-full text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Port</label>
+                  <input type="number" value={sshPort} onChange={(e) => setSshPort(parseInt(e.target.value) || 22)}
+                    className="input w-full text-sm" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Cle privee SSH</label>
+              <textarea value={sshPrivateKey} onChange={(e) => setSshPrivateKey(e.target.value)}
+                placeholder={config.hasSshKey ? "Laisser vide pour garder l'actuelle" : "-----BEGIN OPENSSH PRIVATE KEY-----\n..."}
+                rows={3} className="input w-full font-mono text-xs resize-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Chemin du projet sur le VPS</label>
+              <input type="text" value={vpsPath} onChange={(e) => setVpsPath(e.target.value)}
+                placeholder="/home/deploy/repos/mon-site" className="input w-full font-mono text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Script de deploiement</label>
+              <select value={deployScript} onChange={(e) => setDeployScript(e.target.value)} className="input w-full text-sm">
+                <option value="">Par defaut (git pull + build)</option>
+                <option value="git pull origin main && npm run build">git pull + npm run build</option>
+                <option value="git pull origin main && npm install && npm run build">git pull + npm install + npm run build</option>
+                <option value="git pull origin main && yarn && yarn build">git pull + yarn + yarn build</option>
+                <option value="git pull && npm run build">git pull + npm run build (simple)</option>
+                <option value="./deploy.sh">./deploy.sh (script personnalise)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-4">
+            <p className="text-sm font-bold text-gray-900">Notifications</p>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Email de notification</label>
+              <input type="email" value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)}
+                placeholder="vous@domaine.com" className="input w-full text-sm" />
+              <p className="text-xs text-gray-400 mt-1">Recevez des alertes sur la generation, publication et deploiement.</p>
+            </div>
+          </div>
+
+          {/* Save */}
+          <div className="flex items-center gap-3">
+            <button onClick={handleSave} disabled={saving} className="btn-primary px-6 py-2.5 text-sm">
+              {saving ? "Sauvegarde..." : "Sauvegarder"}
+            </button>
+            {saved && <span className="text-sm text-emerald-600 font-medium animate-fade-in">Configuration sauvegardee</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SiteDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [site, setSite] = useState<any>(null);
   const [articles, setArticles] = useState<any[]>([]);
@@ -204,6 +446,19 @@ export default function SiteDetailPage() {
   const [topicHint, setTopicHint] = useState("");
   const [showTopicInput, setShowTopicInput] = useState(false);
   const [genError, setGenError] = useState("");
+  const [githubMsg, setGithubMsg] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("github") === "connected") {
+      setGithubMsg("GitHub connecte avec succes");
+      setTimeout(() => setGithubMsg(""), 5000);
+      window.history.replaceState({}, "", `/sites/${id}`);
+    } else if (searchParams.get("github_error")) {
+      setGithubMsg(`Erreur GitHub: ${searchParams.get("github_error")}`);
+      setTimeout(() => setGithubMsg(""), 8000);
+      window.history.replaceState({}, "", `/sites/${id}`);
+    }
+  }, [searchParams, id]);
 
   useEffect(() => {
     if (!user || !id) return;
@@ -256,6 +511,12 @@ export default function SiteDetailPage() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           Tous les sites
         </Link>
+
+        {githubMsg && (
+          <div className={`rounded-xl px-4 py-3 mb-4 text-sm font-medium animate-fade-in ${
+            githubMsg.startsWith("Erreur") ? "bg-red-50 border border-red-200 text-red-600" : "bg-emerald-50 border border-emerald-200 text-emerald-700"
+          }`}>{githubMsg}</div>
+        )}
 
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8 animate-fade-in-up">
           <div>
@@ -320,7 +581,8 @@ export default function SiteDetailPage() {
           ))}
         </div>
 
-        <div className="mb-10"><PublicationModeSection siteId={site.id} /></div>
+        <div className="mb-6"><PublicationModeSection siteId={site.id} /></div>
+        <div className="mb-10"><PublishConfigSection siteId={site.id} /></div>
 
         <div className="animate-fade-in">
           <h2 className="text-xl font-bold text-gray-900 mb-5">Articles</h2>

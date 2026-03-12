@@ -314,6 +314,7 @@ Reponds UNIQUEMENT avec le nouveau contenu de la section (texte brut avec <stron
       (article as any).heroImageTitle = heroImage.title;
       (article as any).heroImageCredit = heroImage.credit;
       (article as any).heroImageCreditUrl = heroImage.creditUrl;
+      (article as any).heroImageSourceUrl = heroImage.sourceUrl;
       // Keep direct image URL for the preview (before publication, images aren't on disk yet)
       (article as any).heroImagePreviewUrl = heroImage.previewUrl;
 

@@ -50,6 +50,25 @@ export const getSites = () =>
 export const getSite = (id: string) =>
   request<any>(`/sites/${id}`);
 
+export const createSite = (data: {
+  name: string;
+  slug: string;
+  repoName: string;
+  repoOwner?: string;
+  domain?: string;
+  theme: string;
+  city?: string;
+  department?: string;
+  blogPattern: string;
+  blogBasePath?: string;
+  contentDir?: string;
+  imageDir?: string;
+}) =>
+  request<any>("/sites", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
 // Articles
 export const getArticles = (siteId: string) =>
   request<any[]>(`/articles?siteId=${siteId}`);
@@ -82,6 +101,7 @@ export const updateSchedule = (siteId: string, data: {
   autoApprove?: boolean;
   isActive?: boolean;
   timezone?: string;
+  dayTimes?: Record<string, string>;
 }) =>
   request(`/sites/${siteId}/schedule`, {
     method: "PUT",
@@ -274,6 +294,12 @@ export const getPublishConfig = (siteId: string) =>
     deployScript: string | null;
     notifyEmail: string | null;
   }>(`/publish/config/${siteId}`);
+
+export const clonePublishConfig = (siteId: string, fromSiteId: string, repoName?: string) =>
+  request<{ success: boolean; vpsPath: string; deployScript: string }>(`/publish/config/${siteId}/clone`, {
+    method: "POST",
+    body: JSON.stringify({ fromSiteId, repoName }),
+  });
 
 export const updatePublishConfig = (siteId: string, data: {
   githubToken?: string;

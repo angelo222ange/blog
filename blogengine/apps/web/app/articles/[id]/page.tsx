@@ -9,6 +9,7 @@ import {
   generateSocialPosts, getSocialPostsForArticle,
   updateSocialPost, approveSocialPost, publishSocialPost,
   publishAllSocialPosts, deleteSocialPost, getSocialAccounts,
+  publishArticle, deploySite,
 } from "../../../lib/api";
 
 interface ArticleContent {
@@ -404,6 +405,8 @@ export default function ArticleViewPage() {
   const [content, setContent] = useState<ArticleContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [publishing, setPublishingArticle] = useState(false);
+  const [publishSuccess, setPublishSuccess] = useState(false);
   const [tab, setTab] = useState<"preview" | "meta" | "social" | "json">("preview");
 
   useEffect(() => {
@@ -425,6 +428,20 @@ export default function ArticleViewPage() {
       setArticle({ ...article, ...updated, status });
     } catch (err: any) { alert(err.message || "Erreur"); }
     finally { setUpdating(false); }
+  };
+
+  const handlePublish = async () => {
+    if (!article) return;
+    setPublishingArticle(true);
+    setPublishSuccess(false);
+    try {
+      await publishArticle(article.id);
+      await deploySite(article.siteId);
+      setArticle({ ...article, status: "PUBLISHED" });
+      setPublishSuccess(true);
+      setTimeout(() => setPublishSuccess(false), 4000);
+    } catch (err: any) { alert(err.message || "Erreur de publication"); }
+    finally { setPublishingArticle(false); }
   };
 
   if (authLoading || loading) {
@@ -476,6 +493,16 @@ export default function ArticleViewPage() {
                 <button onClick={() => handleStatusUpdate("REJECTED")} disabled={updating}
                   className="btn-danger-outline px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm disabled:opacity-50">Rejeter</button>
               </>
+            )}
+            {article.status === "APPROVED" && (
+              <button onClick={handlePublish} disabled={publishing}
+                className="btn-primary px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm disabled:opacity-50 flex items-center gap-2">
+                {publishing && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {publishing ? "Publication..." : "Publier sur le blog"}
+              </button>
+            )}
+            {publishSuccess && (
+              <span className="text-xs text-emerald-600 font-medium animate-fade-in">Publie avec succes</span>
             )}
           </div>
         </nav>

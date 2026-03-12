@@ -115,6 +115,7 @@ export async function sitesRoutes(app: FastifyInstance) {
     return {
       ...schedule,
       activeDays: JSON.parse(schedule.activeDays),
+      dayTimes: JSON.parse(schedule.dayTimes || "{}"),
     };
   });
 
@@ -131,6 +132,7 @@ export async function sitesRoutes(app: FastifyInstance) {
       autoApprove: body.autoApprove ?? false,
       isActive: body.isActive ?? true,
       timezone: body.timezone || "Europe/Paris",
+      dayTimes: JSON.stringify(body.dayTimes || {}),
       cronExpr: `0 ${body.postTime?.split(":")[1] || "0"} ${body.postTime?.split(":")[0] || "8"} * * ${(body.activeDays || [1, 2, 3, 4, 5]).join(",")}`,
     };
 
@@ -148,10 +150,10 @@ export async function sitesRoutes(app: FastifyInstance) {
         where: { id: existing.id },
         data,
       });
-      return { ...schedule, activeDays: JSON.parse(schedule.activeDays) };
+      return { ...schedule, activeDays: JSON.parse(schedule.activeDays), dayTimes: JSON.parse(schedule.dayTimes || "{}") };
     }
 
     const schedule = await prisma.schedule.create({ data });
-    return { ...schedule, activeDays: JSON.parse(schedule.activeDays) };
+    return { ...schedule, activeDays: JSON.parse(schedule.activeDays), dayTimes: JSON.parse(schedule.dayTimes || "{}") };
   });
 }

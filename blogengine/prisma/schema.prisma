@@ -123,6 +123,7 @@ model Schedule {
   evergreenPerDay        Int       @default(1)
   newsPerWeek            Int       @default(1)
   autoApprove            Boolean   @default(false)
+  dayTimes               String    @default("{}")
   lastRunAt              DateTime?
   nextRunAt              DateTime?
   lastGeneratedAt        DateTime?

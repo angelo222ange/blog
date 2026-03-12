@@ -44,14 +44,24 @@ export async function generateRoutes(app: FastifyInstance) {
     try {
       const adapter = createAdapter(site as any);
 
-      // Fetch existing hero image URLs for this site to avoid duplicates
+      // Fetch existing hero image source URLs for this site to avoid duplicates
+      // We need the actual source URLs (pexels/wikimedia/unsplash), not filenames
       const existingArticles = await prisma.article.findMany({
-        where: { siteId: site.id, heroImage: { not: null } },
-        select: { heroImage: true },
+        where: { siteId: site.id },
+        select: { heroImage: true, content: true },
       });
-      const usedImageUrls = existingArticles
-        .map((a) => a.heroImage)
-        .filter((url): url is string => !!url);
+      const usedImageUrls: string[] = [];
+      for (const a of existingArticles) {
+        if (a.heroImage) usedImageUrls.push(a.heroImage);
+        if (a.content) {
+          try {
+            const parsed = JSON.parse(a.content);
+            if (parsed.heroImageSourceUrl) usedImageUrls.push(parsed.heroImageSourceUrl);
+            if (parsed.heroImagePreviewUrl) usedImageUrls.push(parsed.heroImagePreviewUrl);
+            if (parsed.heroImageCreditUrl) usedImageUrls.push(parsed.heroImageCreditUrl);
+          } catch {}
+        }
+      }
 
       const result = await generateArticleForSite({
         site: site as any,
@@ -93,6 +103,17 @@ export async function generateRoutes(app: FastifyInstance) {
         },
       });
 
+      // Auto-approve if schedule says so
+      const schedule = await prisma.schedule.findFirst({
+        where: { siteId: site.id, isActive: true },
+      });
+      if (schedule?.autoApprove) {
+        await prisma.article.update({
+          where: { id: article.id },
+          data: { status: "APPROVED" },
+        });
+      }
+
       // Update job log
       await prisma.jobLog.update({
         where: { id: job.id },
@@ -109,7 +130,7 @@ export async function generateRoutes(app: FastifyInstance) {
           (sum: number, s: any) => sum + (s.content || "").split(/\s+/).length,
           0
         );
-        const emailData = formatGenerateSuccess(site.name, result.title, result.slug, wordCount);
+        const emailData = formatGenerateSuccess(site.name, result.title, result.slug, wordCount, article.id);
         sendSuccessNotification({ to: site.notifyEmail, ...emailData }).catch(() => {});
       }
 

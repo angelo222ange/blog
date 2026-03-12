@@ -426,16 +426,29 @@ export class GitPublisher {
         "git pull origin main && yarn && yarn build",
         "git pull && npm run build",
         "./deploy.sh",
+        "git pull origin main && npm install --legacy-peer-deps && npm run build && sudo rsync -a --delete out/ /var/www/${REPO_NAME}/ && sudo chown -R www-data:www-data /var/www/${REPO_NAME}",
       ];
+
+      // Extract repo name from vpsPath for deploy script variable substitution
+      const repoName = site.vpsPath.split("/").filter(Boolean).pop() || "";
 
       let deployCmd: string;
       if (site.deployScript) {
-        if (!ALLOWED_DEPLOY_SCRIPTS.includes(site.deployScript)) {
+        // Replace ${REPO_NAME} placeholder in whitelisted scripts
+        const resolvedScript = site.deployScript.replace(/\$\{REPO_NAME\}/g, repoName);
+        const resolvedWhitelist = ALLOWED_DEPLOY_SCRIPTS.map(s => s.replace(/\$\{REPO_NAME\}/g, repoName));
+        if (!resolvedWhitelist.includes(resolvedScript)) {
           throw new Error(`Deploy script not in whitelist. Allowed: ${ALLOWED_DEPLOY_SCRIPTS.join(", ")}`);
         }
-        deployCmd = `cd ${site.vpsPath} && ${site.deployScript}`;
+        deployCmd = `cd ${site.vpsPath} && ${resolvedScript}`;
       } else {
         deployCmd = `cd ${site.vpsPath} && git pull origin main && npm run build`;
+      }
+
+      // If vpsPath is in another user's home, wrap with sudo -u <owner>
+      const pathOwnerMatch = site.vpsPath.match(/^\/home\/([a-zA-Z0-9_-]+)\//);
+      if (pathOwnerMatch && pathOwnerMatch[1] !== site.sshUser) {
+        deployCmd = `sudo -u ${pathOwnerMatch[1]} bash -c '${deployCmd}'`;
       }
 
       const timeout = setTimeout(() => {

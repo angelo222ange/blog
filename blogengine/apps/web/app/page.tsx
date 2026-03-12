@@ -899,7 +899,10 @@ export default function DashboardPage() {
         <div className="animate-fade-in" style={{ animationDelay: "550ms" }} data-tour="sites">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base md:text-lg font-bold text-gray-900">Vos sites</h2>
-            <span className="text-xs text-gray-400 font-medium">{sites.length} sites</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400 font-medium">{sites.length} sites</span>
+              <Link href="/sites/new" className="btn-primary px-3 py-1.5 text-xs font-semibold">+ Ajouter</Link>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {sites.map((site, i) => (

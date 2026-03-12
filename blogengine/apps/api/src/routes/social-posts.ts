@@ -5,6 +5,7 @@ import { generateSocialPosts, getPlatformClient, decrypt } from "@blogengine/soc
 import type { ArticleForSocial } from "@blogengine/social";
 import { prisma } from "../lib/prisma.js";
 import { authGuard } from "../lib/auth.js";
+import { sendSuccessNotification, sendErrorNotification, formatSocialPublishSuccess, formatSocialPublishError } from "../lib/notify.js";
 import { getSiteImagesForSocial } from "../lib/site-image-scraper.js";
 import path from "node:path";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -223,7 +224,7 @@ async function uploadTempImage(imageBuffer: Buffer): Promise<string | null> {
   try {
     const formData = new FormData();
     const blob = new Blob([imageBuffer], { type: "image/png" });
-    formData.append("image", blob.arrayBuffer ? Buffer.from(imageBuffer).toString("base64") : "");
+    formData.append("image", Buffer.from(imageBuffer).toString("base64"));
 
     // Use imgbb with free API key
     const imgbbKey = process.env.IMGBB_API_KEY;
@@ -836,6 +837,20 @@ async function publishSinglePost(postId: string) {
     });
 
     console.log(`[social] Published to ${post.platform}: ${result.platformUrl}`);
+
+    // Send email notification
+    const notifyEmail = post.article?.site?.notifyEmail || post.site?.notifyEmail;
+    const siteName = post.article?.site?.name || post.site?.name || "Site";
+    if (notifyEmail) {
+      const emailData = formatSocialPublishSuccess(
+        siteName,
+        post.platform,
+        result.platformUrl || undefined,
+        post.article?.title || undefined
+      );
+      sendSuccessNotification({ to: notifyEmail, ...emailData }).catch(() => {});
+    }
+
     return updated;
   } catch (error: any) {
     await prisma.socialPost.update({
@@ -845,6 +860,15 @@ async function publishSinglePost(postId: string) {
         errorMessage: error.message,
       },
     });
+
+    // Send error notification
+    const notifyEmail = post.article?.site?.notifyEmail || post.site?.notifyEmail;
+    const siteName = post.article?.site?.name || post.site?.name || "Site";
+    if (notifyEmail) {
+      const emailData = formatSocialPublishError(siteName, post.platform, error.message);
+      sendErrorNotification({ to: notifyEmail, ...emailData }).catch(() => {});
+    }
+
     throw error;
   }
 }
