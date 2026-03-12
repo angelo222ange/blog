@@ -6,7 +6,7 @@ import { buildUrl } from "./base.js";
 
 const AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization";
 const TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken";
-const SCOPES = "openid profile w_member_social w_organization_social r_organization_social rw_organization_admin";
+const SCOPES = "openid profile w_member_social";
 
 function getCredentials() {
   const clientId = process.env.LINKEDIN_CLIENT_ID;
