@@ -7,7 +7,7 @@ import { buildUrl } from "./base.js";
 
 const AUTH_URL = "https://www.facebook.com/v21.0/dialog/oauth";
 const TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token";
-const SCOPES = "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_insights";
+const SCOPES = "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish";
 
 function getCredentials() {
   const clientId = process.env.META_APP_ID;
