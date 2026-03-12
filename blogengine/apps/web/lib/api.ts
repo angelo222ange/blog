@@ -41,7 +41,7 @@ export const getMe = () =>
   request<{ id: string; email: string; name: string; role: string; onboardedAt: string | null }>("/auth/me");
 
 export const markOnboarded = () =>
-  request("/auth/onboarded", { method: "POST" });
+  request("/auth/onboarded", { method: "POST", body: JSON.stringify({}) });
 
 // Sites
 export const getSites = () =>
