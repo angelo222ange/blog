@@ -1,5 +1,16 @@
 "use client";
 
+/** Sanitize image URLs: convert absolute server paths to web-relative paths */
+function sanitizeImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Detect absolute server paths like /home/ubuntu/.../public/uploads/...
+  const uploadsIdx = url.indexOf("/uploads/");
+  if (uploadsIdx > 0 && !url.startsWith("http") && !url.startsWith("/uploads/")) {
+    return url.slice(uploadsIdx);
+  }
+  return url;
+}
+
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "../../lib/use-auth";
@@ -22,6 +33,8 @@ import {
   getMotionTemplates,
   generateMotionSlides as generateMotionSlidesApi,
   generateAndRenderMotion,
+  fetchSiteMetrics,
+  getMetricsSummary,
 } from "../../lib/api";
 
 // ─── Platform Definitions ───
@@ -142,9 +155,9 @@ function CarouselPreview({ slides, aspectClass = "aspect-square" }: {
   return (
     <div className={`relative w-full ${aspectClass} bg-gray-950 overflow-hidden group select-none`}>
       {/* Background image with heavy dark overlay */}
-      {slide.imageUrl ? (
+      {sanitizeImageUrl(slide.imageUrl) ? (
         <>
-          <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img src={sanitizeImageUrl(slide.imageUrl)!} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/60" />
         </>
       ) : (
@@ -1268,6 +1281,10 @@ export default function SocialPage() {
   const [motionFormat, setMotionFormat] = useState<"square" | "vertical" | "landscape">("square");
   const [generatingMotion, setGeneratingMotion] = useState(false);
   const [motionPreview, setMotionPreview] = useState<any>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [metricsSummary, setMetricsSummary] = useState<any>(null);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [refreshingMetrics, setRefreshingMetrics] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const showToast = useCallback((type: "success" | "error", message: string) => {
     setToast({ type, message });
@@ -1741,6 +1758,175 @@ export default function SocialPage() {
           </div>
         )}
 
+        {/* Analytiques - Social KPIs */}
+        {selectedSiteId && (
+          <div className="mt-8 card p-5 animate-fade-in" style={{ animationDelay: "350ms" }}>
+            <button
+              onClick={() => {
+                setShowAnalytics(!showAnalytics);
+                if (!showAnalytics && !metricsSummary) {
+                  setLoadingMetrics(true);
+                  getMetricsSummary(selectedSiteId)
+                    .then(setMetricsSummary)
+                    .catch(() => {})
+                    .finally(() => setLoadingMetrics(false));
+                }
+              }}
+              className="w-full flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                </svg>
+                <div className="text-left">
+                  <h3 className="text-base font-bold text-gray-900">Analytiques</h3>
+                  <p className="text-xs text-gray-500">KPIs et performances de vos publications</p>
+                </div>
+              </div>
+              <svg className={`w-5 h-5 text-gray-400 transition-transform ${showAnalytics ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {showAnalytics && (
+              <div className="mt-5 space-y-5">
+                {/* Refresh button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={async () => {
+                      setRefreshingMetrics(true);
+                      try {
+                        await fetchSiteMetrics(selectedSiteId);
+                        const summary = await getMetricsSummary(selectedSiteId);
+                        setMetricsSummary(summary);
+                        showToast("success", "Metriques actualisees");
+                      } catch (err: any) {
+                        showToast("error", err.message || "Erreur lors de l'actualisation");
+                      } finally {
+                        setRefreshingMetrics(false);
+                      }
+                    }}
+                    disabled={refreshingMetrics}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    <svg className={`w-4 h-4 ${refreshingMetrics ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                    </svg>
+                    {refreshingMetrics ? "Actualisation..." : "Actualiser les metriques"}
+                  </button>
+                </div>
+
+                {loadingMetrics ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">Chargement des metriques...</div>
+                ) : metricsSummary ? (
+                  <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50 rounded-2xl p-4">
+                        <p className="text-xs font-medium text-blue-600 mb-1">Impressions</p>
+                        <p className="text-2xl font-bold text-gray-900">{(metricsSummary.totalImpressions || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50 rounded-2xl p-4">
+                        <p className="text-xs font-medium text-emerald-600 mb-1">Engagement</p>
+                        <p className="text-2xl font-bold text-gray-900">{(metricsSummary.totalEngagement || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200/50 rounded-2xl p-4">
+                        <p className="text-xs font-medium text-purple-600 mb-1">Taux moyen</p>
+                        <p className="text-2xl font-bold text-gray-900">{metricsSummary.avgEngagementRate || 0}%</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50 rounded-2xl p-4">
+                        <p className="text-xs font-medium text-amber-600 mb-1">Meilleure plateforme</p>
+                        <p className="text-2xl font-bold text-gray-900 capitalize">{metricsSummary.bestPlatform || "-"}</p>
+                        <p className="text-xs text-gray-500">{metricsSummary.bestPlatformRate || 0}% engagement</p>
+                      </div>
+                    </div>
+
+                    {/* Posts table */}
+                    {metricsSummary.posts && metricsSummary.posts.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Plateforme</th>
+                              <th className="text-left py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Contenu</th>
+                              <th className="text-left py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Date</th>
+                              <th className="text-right py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Impressions</th>
+                              <th className="text-right py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Engagement</th>
+                              <th className="text-right py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Taux</th>
+                              <th className="text-center py-2 px-3 font-semibold text-gray-500 text-xs uppercase">Lien</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {metricsSummary.posts.map((p: any) => (
+                              <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                <td className="py-2.5 px-3">
+                                  <span className="capitalize font-medium text-gray-700">{p.platform}</span>
+                                </td>
+                                <td className="py-2.5 px-3 max-w-[200px] truncate text-gray-600" title={p.content}>
+                                  {p.content.slice(0, 60)}{p.content.length > 60 ? "..." : ""}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap">
+                                  {p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("fr-FR") : "-"}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono text-gray-700">
+                                  {(p.metrics.impressions || 0).toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono text-gray-700">
+                                  {(p.metrics.engagement || 0).toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-3 text-right">
+                                  <span className={`font-mono font-semibold ${p.metrics.engagementRate >= 3 ? "text-emerald-600" : p.metrics.engagementRate >= 1 ? "text-blue-600" : "text-gray-500"}`}>
+                                    {p.metrics.engagementRate}%
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {p.platformUrl ? (
+                                    <a href={p.platformUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">
+                                      <svg className="w-4 h-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                      </svg>
+                                    </a>
+                                  ) : "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-gray-400 text-sm">
+                        Aucune metrique disponible. Publiez des posts puis cliquez sur "Actualiser les metriques".
+                      </div>
+                    )}
+
+                    {/* Top performers note */}
+                    {metricsSummary.posts && metricsSummary.posts.length > 0 && (
+                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200/50 rounded-2xl p-4">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                          </svg>
+                          <div>
+                            <p className="text-sm font-semibold text-indigo-800">Auto-optimisation IA active</p>
+                            <p className="text-xs text-indigo-600 mt-0.5">
+                              Les metriques de vos top performers sont automatiquement injectees dans le prompt de generation.
+                              L'IA s'inspire du style et de la structure de vos publications les plus performantes pour maximiser l'engagement.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    Cliquez sur "Actualiser les metriques" pour recuperer les donnees depuis vos plateformes.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Motion Design - standalone section, no social accounts needed */}
         {selectedSiteId && (
           <div className="mt-8 card p-5 animate-fade-in" style={{ animationDelay: "400ms" }}>
@@ -1933,8 +2119,10 @@ export default function SocialPage() {
                 const activePlatform = previewPostId === post.id && previewPlatform ? previewPlatform : post.platform;
                 // TikTok is always phone — no desktop layout exists
                 const activeDevice = activePlatform === "tiktok" ? "phone" : previewDevice;
-                const imageUrl = post.mediaUrls?.[0];
-                const carouselSlides = post.carouselData as Array<{ slideType?: string; title: string; subtitle: string; highlight?: string; imageUrl?: string | null }> | null;
+                const imageUrl = sanitizeImageUrl(post.mediaUrls?.[0]);
+                const carouselSlides = post.carouselData
+                  ? (post.carouselData as Array<{ slideType?: string; title: string; subtitle: string; highlight?: string; imageUrl?: string | null }>).map(s => ({ ...s, imageUrl: sanitizeImageUrl(s.imageUrl) }))
+                  : null;
                 const hasCarousel = carouselSlides && carouselSlides.length > 0;
                 const displayContent = isEditing ? editContent : post.content;
                 const displayHashtags = isEditing
