@@ -66,11 +66,11 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: "Compte non autorise. Contactez l'administrateur." });
     }
 
-    if (!user.provider) {
+    if (!(user as any).provider) {
       // Existing local user — link OAuth provider
       await prisma.user.update({
         where: { id: user.id },
-        data: { provider, providerId },
+        data: { provider, providerId } as any,
       });
     }
 

@@ -88,7 +88,7 @@ function getSearchTermsForSite(siteName: string, siteTheme: string, topic?: stri
   // Shuffle to get variety across posts
   for (let i = terms.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [terms[i], terms[j]] = [terms[j], terms[i]];
+    [terms[i], terms[j]] = [terms[j]!, terms[i]!];
   }
 
   return terms;
@@ -153,11 +153,11 @@ const AI_IMAGE_STYLES: Record<string, string> = {
 
 function getAIImageStyle(theme: string): string {
   const t = theme.toUpperCase();
-  if (t.includes("SERVICE") || t.includes("ARTISAN") || t.includes("LOCAL")) return AI_IMAGE_STYLES.LOCAL_SERVICE;
-  if (t.includes("SAAS") || t.includes("TECH") || t.includes("SOFTWARE")) return AI_IMAGE_STYLES.SAAS;
-  if (t.includes("COMMERCE") || t.includes("SHOP") || t.includes("BOUTIQUE")) return AI_IMAGE_STYLES.ECOMMERCE;
-  if (t.includes("COACH") || t.includes("CONSEIL") || t.includes("FORMATION")) return AI_IMAGE_STYLES.COACHING;
-  return AI_IMAGE_STYLES.DEFAULT;
+  if (t.includes("SERVICE") || t.includes("ARTISAN") || t.includes("LOCAL")) return AI_IMAGE_STYLES.LOCAL_SERVICE!;
+  if (t.includes("SAAS") || t.includes("TECH") || t.includes("SOFTWARE")) return AI_IMAGE_STYLES.SAAS!;
+  if (t.includes("COMMERCE") || t.includes("SHOP") || t.includes("BOUTIQUE")) return AI_IMAGE_STYLES.ECOMMERCE!;
+  if (t.includes("COACH") || t.includes("CONSEIL") || t.includes("FORMATION")) return AI_IMAGE_STYLES.COACHING!;
+  return AI_IMAGE_STYLES.DEFAULT!;
 }
 
 /**
@@ -223,7 +223,7 @@ async function uploadTempImage(imageBuffer: Buffer): Promise<string | null> {
   // Try imgbb (free, no key needed for small images)
   try {
     const formData = new FormData();
-    const blob = new Blob([imageBuffer], { type: "image/png" });
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/png" });
     formData.append("image", Buffer.from(imageBuffer).toString("base64"));
 
     // Use imgbb with free API key

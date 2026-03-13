@@ -105,12 +105,12 @@ export async function scrapeWebsiteImages(domain: string): Promise<ScrapedImage[
         const heightMatch = tag.match(/height=["']?(\d+)/);
 
         if (!srcMatch) continue;
-        const resolvedUrl = resolveUrl(srcMatch[1], baseUrl);
+        const resolvedUrl = resolveUrl(srcMatch[1]!, baseUrl);
         if (!resolvedUrl || seenUrls.has(resolvedUrl)) continue;
         if (shouldSkipImage(resolvedUrl)) continue;
 
-        const w = widthMatch ? parseInt(widthMatch[1]) : null;
-        const h = heightMatch ? parseInt(heightMatch[1]) : null;
+        const w = widthMatch ? parseInt(widthMatch[1]!) : null;
+        const h = heightMatch ? parseInt(heightMatch[1]!) : null;
 
         // Skip known-small images
         if (w && w < MIN_WIDTH) continue;
@@ -130,7 +130,7 @@ export async function scrapeWebsiteImages(domain: string): Promise<ScrapedImage[
       // Also extract CSS background images from style attributes and inline styles
       const bgRegex = /background(?:-image)?:\s*url\(["']?([^"')]+)["']?\)/gi;
       while ((match = bgRegex.exec(html)) !== null) {
-        const resolvedUrl = resolveUrl(match[1], baseUrl);
+        const resolvedUrl = resolveUrl(match[1]!, baseUrl);
         if (!resolvedUrl || seenUrls.has(resolvedUrl)) continue;
         if (shouldSkipImage(resolvedUrl)) continue;
 
@@ -147,7 +147,7 @@ export async function scrapeWebsiteImages(domain: string): Promise<ScrapedImage[
       // Extract og:image and twitter:image meta tags
       const ogRegex = /(?:og:image|twitter:image)[^>]*content=["']([^"']+)["']/gi;
       while ((match = ogRegex.exec(html)) !== null) {
-        const resolvedUrl = resolveUrl(match[1], baseUrl);
+        const resolvedUrl = resolveUrl(match[1]!, baseUrl);
         if (!resolvedUrl || seenUrls.has(resolvedUrl)) continue;
         seenUrls.add(resolvedUrl);
         images.push({
