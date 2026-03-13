@@ -436,7 +436,8 @@ export default function ArticleViewPage() {
     setPublishSuccess(false);
     try {
       await publishArticle(article.id);
-      await deploySite(article.siteId);
+      // Deploy to VPS (optional — skip if SSH not configured)
+      try { await deploySite(article.siteId); } catch {}
       setArticle({ ...article, status: "PUBLISHED" });
       setPublishSuccess(true);
       setTimeout(() => setPublishSuccess(false), 4000);
