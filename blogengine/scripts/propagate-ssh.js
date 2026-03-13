@@ -1,9 +1,6 @@
 /**
  * Propagate SSH config to all sites in the database.
  * Run ON THE VPS: node scripts/propagate-ssh.js
- *
- * Reads the SSH private key from ~/.ssh/, encrypts it,
- * and updates all sites with SSH/VPS deploy config.
  */
 const fs = require("fs");
 const path = require("path");
@@ -14,24 +11,25 @@ const envPath = path.join(__dirname, "..", ".env");
 const envContent = fs.readFileSync(envPath, "utf-8");
 const env = {};
 for (const line of envContent.split("\n")) {
-  const match = line.match(/^([A-Z_]+)=(.*)$/);
+  const match = line.match(/^([A-Z_0-9]+)=(.*)$/);
   if (match) env[match[1]] = match[2].replace(/^["']|["']$/g, "");
 }
 
-const ENCRYPTION_KEY = env.ENCRYPTION_KEY;
-if (!ENCRYPTION_KEY) {
-  console.error("ENCRYPTION_KEY not found in .env");
+const ENCRYPTION_KEY_HEX = env.SOCIAL_ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY_HEX || ENCRYPTION_KEY_HEX.length !== 64) {
+  console.error("SOCIAL_ENCRYPTION_KEY not found or invalid in .env (need 64-char hex)");
   process.exit(1);
 }
 
-// Encryption (same as packages/social/src/encryption.ts)
-function encrypt(text) {
-  const key = crypto.scryptSync(ENCRYPTION_KEY, "salt", 32);
+// AES-256-GCM encryption (matches packages/social/src/encryption.ts)
+function encrypt(plaintext) {
+  const key = Buffer.from(ENCRYPTION_KEY_HEX, "hex");
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-  let encrypted = cipher.update(text, "utf8", "base64");
-  encrypted += cipher.final("base64");
-  return `${iv.toString("base64")}:${encrypted}`;
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  let encrypted = cipher.update(plaintext, "utf8");
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString("base64")}:${tag.toString("base64")}:${encrypted.toString("base64")}`;
 }
 
 // Find SSH key
@@ -49,8 +47,7 @@ const keyFile = keyFiles[0];
 const keyPath = path.join(sshDir, keyFile);
 const privateKey = fs.readFileSync(keyPath, "utf-8");
 
-console.log(`Using SSH key: ~/.ssh/${keyFile}`);
-console.log(`Key starts with: ${privateKey.substring(0, 30)}...`);
+console.log("Using SSH key: ~/.ssh/" + keyFile);
 
 // Encrypt the key
 const encryptedKey = encrypt(privateKey);
@@ -68,10 +65,10 @@ const prisma = new PrismaClient();
 async function main() {
   const sites = await prisma.site.findMany({ select: { id: true, name: true, repoName: true } });
 
-  console.log(`\nUpdating ${sites.length} sites...\n`);
+  console.log("\nUpdating " + sites.length + " sites...\n");
 
   for (const site of sites) {
-    const vpsPath = `/home/deploy/repos/${site.repoName}`;
+    const vpsPath = "/home/deploy/repos/" + site.repoName;
 
     await prisma.site.update({
       where: { id: site.id },
@@ -85,7 +82,7 @@ async function main() {
       },
     });
 
-    console.log(`  ${site.name} -> ${vpsPath}`);
+    console.log("  " + site.name + " -> " + vpsPath);
   }
 
   console.log("\nDone! All sites now have SSH config.");
