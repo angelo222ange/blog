@@ -430,17 +430,22 @@ export default function ArticleViewPage() {
     finally { setUpdating(false); }
   };
 
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+
   const handlePublish = async () => {
     if (!article) return;
     setPublishingArticle(true);
     setPublishSuccess(false);
+    setPublishedUrl(null);
     try {
       await publishArticle(article.id);
       // Deploy to VPS (optional — skip if SSH not configured)
       try { await deploySite(article.siteId); } catch {}
       setArticle({ ...article, status: "PUBLISHED" });
       setPublishSuccess(true);
-      setTimeout(() => setPublishSuccess(false), 4000);
+      if (article.site?.domain && article.slug) {
+        setPublishedUrl(`https://${article.site.domain}/blog/${article.slug}`);
+      }
     } catch (err: any) { alert(err.message || "Erreur de publication"); }
     finally { setPublishingArticle(false); }
   };
@@ -495,6 +500,12 @@ export default function ArticleViewPage() {
                   className="btn-danger-outline px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm disabled:opacity-50">Rejeter</button>
               </>
             )}
+            {article.status === "PUBLISHED" && article.site?.domain && article.slug && (
+              <a href={`https://${article.site.domain}/blog/${article.slug}`} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium underline underline-offset-2">
+                Voir sur le blog
+              </a>
+            )}
             {article.status === "APPROVED" && (
               <button onClick={handlePublish} disabled={publishing}
                 className="btn-primary px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm disabled:opacity-50 flex items-center gap-2">
@@ -503,7 +514,15 @@ export default function ArticleViewPage() {
               </button>
             )}
             {publishSuccess && (
-              <span className="text-xs text-emerald-600 font-medium animate-fade-in">Publie avec succes</span>
+              <div className="flex items-center gap-2 animate-fade-in">
+                <span className="text-xs text-emerald-600 font-medium">Publie avec succes</span>
+                {publishedUrl && (
+                  <a href={publishedUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium underline underline-offset-2">
+                    Voir sur le blog
+                  </a>
+                )}
+              </div>
             )}
           </div>
         </nav>
