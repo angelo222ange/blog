@@ -62,19 +62,11 @@ export async function authRoutes(app: FastifyInstance) {
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      // Create user from OAuth (random password hash since they use OAuth)
-      const randomHash = await bcrypt.hash(randomUUID(), 10);
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: name || null,
-          passwordHash: randomHash,
-          role: "USER",
-          provider,
-          providerId,
-        },
-      });
-    } else if (!user.provider) {
+      // Block external sign-ups: only existing users can log in via OAuth
+      return reply.status(403).send({ error: "Compte non autorise. Contactez l'administrateur." });
+    }
+
+    if (!user.provider) {
       // Existing local user — link OAuth provider
       await prisma.user.update({
         where: { id: user.id },

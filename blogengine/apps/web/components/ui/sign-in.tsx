@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 // --- OAuth Provider Icons ---
@@ -46,22 +46,72 @@ interface SignInPageProps {
   error?: string;
 }
 
-const TestimonialCard = ({ testimonial, delay }: { testimonial: Testimonial; delay: string }) => (
-  <div
-    className={`animate-signin-testimonial ${delay} flex items-start gap-3 rounded-2xl bg-white/30 backdrop-blur-xl border border-white/20 p-4 w-60`}
-  >
-    <img
-      src={testimonial.avatarSrc}
-      className="h-9 w-9 object-cover rounded-xl"
-      alt={testimonial.name}
-    />
-    <div className="text-sm leading-snug">
-      <p className="font-semibold text-white">{testimonial.name}</p>
-      <p className="text-white/60 text-xs">{testimonial.handle}</p>
-      <p className="mt-1 text-white/80 text-xs">{testimonial.text}</p>
+const TestimonialCarousel = ({ testimonials }: { testimonials: Testimonial[] }) => {
+  const [active, setActive] = useState(0);
+  const [direction, setDirection] = useState<"next" | "prev">("next");
+
+  const goTo = useCallback(
+    (idx: number) => {
+      setDirection(idx > active ? "next" : "prev");
+      setActive(idx);
+    },
+    [active]
+  );
+
+  useEffect(() => {
+    if (testimonials.length <= 1) return;
+    const timer = setInterval(() => {
+      setDirection("next");
+      setActive((prev) => (prev + 1) % testimonials.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [testimonials.length]);
+
+  if (testimonials.length === 0) return null;
+
+  return (
+    <div className="w-full max-w-sm">
+      <div className="relative h-28 overflow-hidden">
+        {testimonials.map((t, i) => (
+          <div
+            key={i}
+            className={`absolute inset-0 flex items-start gap-3.5 rounded-2xl bg-white/20 backdrop-blur-xl border border-white/15 p-5 transition-all duration-500 ease-out ${
+              i === active
+                ? "opacity-100 translate-x-0"
+                : direction === "next"
+                  ? "opacity-0 translate-x-8"
+                  : "opacity-0 -translate-x-8"
+            }`}
+          >
+            <img
+              src={t.avatarSrc}
+              className="h-10 w-10 object-cover rounded-full flex-shrink-0"
+              alt={t.name}
+            />
+            <div className="text-sm leading-snug min-w-0">
+              <p className="font-semibold text-white">{t.name}</p>
+              <p className="text-white/50 text-xs">{t.handle}</p>
+              <p className="mt-1.5 text-white/80 text-xs line-clamp-2">{t.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      {testimonials.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-3">
+          {testimonials.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === active ? "w-6 bg-white/80" : "w-1.5 bg-white/30 hover:bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // --- Main Component ---
 
@@ -217,18 +267,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-black/50 via-transparent to-black/10" />
           </div>
           {testimonials.length > 0 && (
-            <div className="absolute bottom-7 left-1/2 -translate-x-1/2 flex gap-3 px-6 w-full justify-center">
-              <TestimonialCard testimonial={testimonials[0]} delay="animate-signin-delay-1000" />
-              {testimonials[1] && (
-                <div className="hidden xl:flex">
-                  <TestimonialCard testimonial={testimonials[1]} delay="animate-signin-delay-1200" />
-                </div>
-              )}
-              {testimonials[2] && (
-                <div className="hidden 2xl:flex">
-                  <TestimonialCard testimonial={testimonials[2]} delay="animate-signin-delay-1400" />
-                </div>
-              )}
+            <div className="absolute bottom-7 left-0 right-0 flex justify-center px-6 animate-signin-testimonial animate-signin-delay-1000">
+              <TestimonialCarousel testimonials={testimonials} />
             </div>
           )}
         </section>

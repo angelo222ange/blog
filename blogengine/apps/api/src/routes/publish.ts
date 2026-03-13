@@ -5,7 +5,7 @@ import { GitPublisher } from "@blogengine/publisher";
 import type { PublishSiteInfo, DeploySiteInfo } from "@blogengine/publisher";
 import { createAdapter } from "@blogengine/adapters";
 import { encrypt, decrypt } from "@blogengine/social";
-import { sendErrorNotification, sendSuccessNotification, formatPublishError, formatPublishSuccess, formatDeploySuccess, formatDeployError } from "../lib/notify.js";
+import { sendErrorNotification, sendSuccessNotification, formatPublishError, formatPublishSuccess, formatDeployError } from "../lib/notify.js";
 import { randomBytes } from "node:crypto";
 
 const publisher = new GitPublisher();
@@ -391,11 +391,7 @@ export async function publishRoutes(app: FastifyInstance) {
           },
         });
 
-        // Send deploy success notification
-        if (site.notifyEmail) {
-          const emailData = formatDeploySuccess(site.name, site.domain || undefined);
-          sendSuccessNotification({ to: site.notifyEmail, ...emailData }).catch(() => {});
-        }
+        // Deploy success notification removed: only publish success and errors are sent
 
         return {
           success: true,

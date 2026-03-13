@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { authGuard } from "../lib/auth.js";
 import { generateArticleForSite } from "@blogengine/generator";
 import { createAdapter } from "@blogengine/adapters";
-import { sendSuccessNotification, sendErrorNotification, formatGenerateSuccess } from "../lib/notify.js";
+import { sendErrorNotification } from "../lib/notify.js";
 
 export async function generateRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authGuard);
@@ -124,15 +124,7 @@ export async function generateRoutes(app: FastifyInstance) {
         },
       });
 
-      // Send email notification
-      if (site.notifyEmail) {
-        const wordCount = (result.sections || []).reduce(
-          (sum: number, s: any) => sum + (s.content || "").split(/\s+/).length,
-          0
-        );
-        const emailData = formatGenerateSuccess(site.name, result.title, result.slug, wordCount, article.id);
-        sendSuccessNotification({ to: site.notifyEmail, ...emailData }).catch(() => {});
-      }
+      // Email notification removed: only publish success and errors are sent
 
       return reply.status(201).send(article);
     } catch (error: any) {
