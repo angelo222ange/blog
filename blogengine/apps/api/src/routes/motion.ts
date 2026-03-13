@@ -8,11 +8,9 @@ import {
 } from "@blogengine/motion";
 import type { MotionVideoConfig, MotionSlide } from "@blogengine/motion";
 import { join } from "node:path";
-import { mkdirSync, existsSync, writeFileSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
 
 const UPLOADS_DIR = join(process.cwd(), "public", "uploads", "motion");
-const MOTION_IMAGES_DIR = join(process.cwd(), "public", "uploads", "motion-images");
-const API_PORT = Number(process.env.API_PORT) || 4000;
 
 /**
  * Resolve imagePrompt fields on slides into actual imageUrl paths.
@@ -24,10 +22,6 @@ async function resolveSlideImages(slides: MotionSlide[]): Promise<MotionSlide[]>
   if (!pexelsKey) {
     console.log("[motion] No PEXELS_API_KEY, skipping slide images");
     return slides;
-  }
-
-  if (!existsSync(MOTION_IMAGES_DIR)) {
-    mkdirSync(MOTION_IMAGES_DIR, { recursive: true });
   }
 
   const usedUrls = new Set<string>();
@@ -63,22 +57,18 @@ async function resolveSlideImages(slides: MotionSlide[]): Promise<MotionSlide[]>
         }
         if (!photoUrl) return slide;
 
-        // Download and save locally
+        // Download and convert to data URL (works everywhere: Remotion, browser, no file path issues)
         const imgRes = await fetch(photoUrl, { signal: AbortSignal.timeout(15000) });
         if (!imgRes.ok) return slide;
 
         const buffer = Buffer.from(await imgRes.arrayBuffer());
-        const filename = `slide-${Date.now()}-${i}.jpg`;
-        const filepath = join(MOTION_IMAGES_DIR, filename);
-        writeFileSync(filepath, buffer);
+        const dataUrl = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
-        console.log(`[motion] Slide ${i} image: ${filename} (${(buffer.length / 1024).toFixed(0)} Ko)`);
+        console.log(`[motion] Slide ${i} image: ${(buffer.length / 1024).toFixed(0)} Ko (data URL)`);
 
-        // Return both: absolute path for Remotion rendering, web URL for frontend preview
         return {
           ...slide,
-          imageUrl: `/uploads/motion-images/${filename}`,
-          imageFilePath: filepath,
+          imageUrl: dataUrl,
         };
       } catch (err: any) {
         console.log(`[motion] Slide ${i} image failed: ${err.message}`);
@@ -158,18 +148,9 @@ export async function motionRoutes(app: FastifyInstance) {
       // Resolve slide images from Pexels
       config.slides = await resolveSlideImages(config.slides);
 
-      // Strip internal file paths before sending to frontend
-      const safeConfig = {
-        ...config,
-        slides: config.slides.map((s: any) => {
-          const { imageFilePath, ...rest } = s;
-          return rest;
-        }),
-      };
-
       return {
         success: true,
-        config: safeConfig,
+        config,
         templateId: templateId || null,
         estimatedDuration: `${(config.slides.reduce((s, sl) => s + sl.durationFrames, 0) / config.fps).toFixed(1)}s`,
       };
@@ -197,19 +178,9 @@ export async function motionRoutes(app: FastifyInstance) {
     }
 
     try {
-      // Convert web paths to HTTP URLs for Remotion (headless Chromium needs HTTP, not file paths)
-      const renderConfig = {
-        ...config,
-        slides: config.slides.map((s: any) => ({
-          ...s,
-          imageUrl: s.imageUrl?.startsWith("/uploads/")
-            ? `http://localhost:${API_PORT}${s.imageUrl}`
-            : s.imageUrl,
-        })),
-      };
       const filename = `motion-${Date.now()}.${config.outputFormat || "mp4"}`;
       const result = await renderMotionVideo({
-        config: renderConfig,
+        config,
         outputDir: UPLOADS_DIR,
         filename,
       });
@@ -300,36 +271,17 @@ export async function motionRoutes(app: FastifyInstance) {
       }
       // default is square (1080x1080)
 
-      // Step 2: Render video — use HTTP URLs for Remotion (headless Chromium needs HTTP, not file paths)
-      const renderConfig2 = {
-        ...config,
-        slides: config.slides.map((s: any) => ({
-          ...s,
-          imageUrl: s.imageUrl?.startsWith("/uploads/")
-            ? `http://localhost:${API_PORT}${s.imageUrl}`
-            : s.imageUrl,
-        })),
-      };
       const filename = `motion-${Date.now()}.${config.outputFormat}`;
       const result = await renderMotionVideo({
-        config: renderConfig2,
+        config,
         outputDir: UPLOADS_DIR,
         filename,
       });
 
-      // Strip internal file paths before sending to frontend
-      const safeConfig2 = {
-        ...config,
-        slides: config.slides.map((s: any) => {
-          const { imageFilePath, ...rest } = s;
-          return rest;
-        }),
-      };
-
       return {
         success: true,
         videoUrl: `/uploads/motion/${filename}`,
-        config: safeConfig2,
+        config,
         durationMs: result.durationMs,
         sizeBytes: result.sizeBytes,
       };
