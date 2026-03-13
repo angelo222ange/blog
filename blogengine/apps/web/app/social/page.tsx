@@ -316,7 +316,7 @@ function PostPreviewModal({
   const meta = PLATFORM_META[platform] || PLATFORM_META.facebook;
   const imageRatio = PLATFORM_IMAGE_RATIO[platform] || PLATFORM_IMAGE_RATIO.facebook;
   const rules = PLATFORM_RULES[platform] || PLATFORM_RULES.facebook;
-  const imageUrl = post.mediaUrls?.[0] ?? null;
+  const imageUrl = sanitizeImageUrl(post.mediaUrls?.[0]) ?? null;
   const hashtags = (Array.isArray(post.hashtags) ? post.hashtags : []).map((h: string) => h.startsWith("#") ? h : `#${h}`).join(" ");
   const isCompatible = !(rules.requiresCarousel && (!imageUrl || (post.mediaUrls?.length || 0) < 2));
   const allPlatforms = connectedPlatforms.length > 0 ? connectedPlatforms : ALL_PLATFORMS;
