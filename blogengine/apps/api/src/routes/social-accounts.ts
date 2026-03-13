@@ -147,6 +147,7 @@ export async function socialAccountsRoutes(app: FastifyInstance) {
                 ? new Date(Date.now() + tokens.expiresIn * 1000)
                 : null,
               scope: tokens.scope,
+              metadata: JSON.stringify({ instagramId: tokens.platformUserId || "default" }),
             },
             update: {
               accessToken: encrypt(tokens.accessToken),
@@ -154,6 +155,7 @@ export async function socialAccountsRoutes(app: FastifyInstance) {
               tokenExpiresAt: tokens.expiresIn
                 ? new Date(Date.now() + tokens.expiresIn * 1000)
                 : null,
+              metadata: JSON.stringify({ instagramId: tokens.platformUserId || "default" }),
             },
           });
         // Facebook - discover pages and linked Instagram accounts

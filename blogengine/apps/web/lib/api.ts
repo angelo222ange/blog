@@ -208,6 +208,47 @@ export const publishAllSocialPosts = (articleId: string) =>
 export const deleteSocialPost = (postId: string) =>
   request(`/social-posts/${postId}`, { method: "DELETE", body: JSON.stringify({}) });
 
+// ─── Social Metrics ───
+
+export const fetchPostMetrics = (postId: string) =>
+  request(`/social-posts/${postId}/fetch-metrics`, { method: "POST", body: JSON.stringify({}) });
+
+export const fetchSiteMetrics = (siteId: string) =>
+  request(`/social-posts/fetch-metrics-site/${siteId}`, { method: "POST", body: JSON.stringify({}) });
+
+export const getMetricsSummary = (siteId: string) =>
+  request<{
+    totalImpressions: number;
+    totalEngagement: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    avgEngagementRate: number;
+    bestPlatform: string;
+    bestPlatformRate: number;
+    postsTracked: number;
+    posts: Array<{
+      id: string;
+      platform: string;
+      content: string;
+      publishedAt: string | null;
+      platformUrl: string | null;
+      accountName: string | null;
+      metrics: {
+        impressions: number;
+        reach: number;
+        engagement: number;
+        likes: number;
+        comments: number;
+        shares: number;
+        saves: number;
+        clicks: number;
+        engagementRate: number;
+        fetchedAt: string;
+      };
+    }>;
+  }>(`/social-posts/metrics-summary/${siteId}`);
+
 // LinkedIn Organizations
 export const getLinkedInOrgs = (accountId: string) =>
   request<{
