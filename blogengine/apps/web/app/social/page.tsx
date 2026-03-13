@@ -11,6 +11,13 @@ function sanitizeImageUrl(url: string | null | undefined): string | null {
   return url;
 }
 
+/** Safe image component that sanitizes src automatically */
+function SafeImg({ src, alt, className }: { src: string | null | undefined; alt?: string; className?: string }) {
+  const safeSrc = sanitizeImageUrl(src);
+  if (!safeSrc) return null;
+  return <img src={safeSrc} alt={alt || ""} className={className} />;
+}
+
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "../../lib/use-auth";
@@ -157,7 +164,8 @@ function CarouselPreview({ slides, aspectClass = "aspect-square" }: {
       {/* Background image with heavy dark overlay */}
       {sanitizeImageUrl(slide.imageUrl) ? (
         <>
-          <img src={sanitizeImageUrl(slide.imageUrl)!} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <SafeImg src={slide.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
+
           <div className="absolute inset-0 bg-black/60" />
         </>
       ) : (
@@ -512,7 +520,7 @@ function PostPreviewModal({
                   <>
                     {imageUrl && (
                       <div className="w-full aspect-square bg-gray-100 overflow-hidden">
-                        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                        <SafeImg src={imageUrl} className="w-full h-full object-cover" />
                       </div>
                     )}
                     <div className="px-4 py-3">
@@ -539,7 +547,7 @@ function PostPreviewModal({
                   <div className="relative bg-black">
                     {imageUrl ? (
                       <div className={`w-full ${device === "phone" ? "aspect-[9/16]" : "aspect-video"} overflow-hidden`}>
-                        <img src={imageUrl} alt="" className="w-full h-full object-cover opacity-90" />
+                        <SafeImg src={imageUrl} className="w-full h-full object-cover opacity-90" />
                       </div>
                     ) : (
                       <div className={`w-full ${device === "phone" ? "aspect-[9/16]" : "aspect-video"} bg-gray-900`} />
@@ -580,7 +588,7 @@ function PostPreviewModal({
                     {imageUrl && (
                       <div className="mx-4 mb-3 rounded-2xl overflow-hidden border border-gray-200">
                         <div className="w-full aspect-video bg-gray-100 overflow-hidden">
-                          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                          <SafeImg src={imageUrl} className="w-full h-full object-cover" />
                         </div>
                       </div>
                     )}
@@ -602,7 +610,7 @@ function PostPreviewModal({
                   <>
                     {imageUrl && (
                       <div className="w-full aspect-[2/3] max-h-[400px] bg-gray-100 overflow-hidden">
-                        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                        <SafeImg src={imageUrl} className="w-full h-full object-cover" />
                       </div>
                     )}
                     <div className="px-4 py-3">
@@ -622,7 +630,7 @@ function PostPreviewModal({
                     </div>
                     {imageUrl && (
                       <div className={`w-full ${imageRatio.css} bg-gray-100 overflow-hidden`}>
-                        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                        <SafeImg src={imageUrl} className="w-full h-full object-cover" />
                       </div>
                     )}
                     <div className="px-4 py-1.5 flex justify-between text-gray-500 text-[12px]">
@@ -2255,7 +2263,7 @@ export default function SocialPage() {
                                 {hasCarousel ? (
                                   <CarouselPreview slides={carouselSlides!} aspectClass="aspect-[1.91/1]" />
                                 ) : imageUrl ? (
-                                  <div className="w-full aspect-[1.91/1] bg-gray-100 overflow-hidden"><img src={imageUrl} alt="" className="w-full h-full object-cover" /></div>
+                                  <div className="w-full aspect-[1.91/1] bg-gray-100 overflow-hidden"><SafeImg src={imageUrl} className="w-full h-full object-cover" /></div>
                                 ) : null}
                                 <div className="px-4 py-1.5 flex justify-between text-[12px] text-gray-500 border-b border-gray-100">
                                   <div className="flex items-center gap-1">
@@ -2295,7 +2303,7 @@ export default function SocialPage() {
                                 {hasCarousel ? (
                                   <CarouselPreview slides={carouselSlides!} aspectClass="aspect-square" />
                                 ) : imageUrl ? (
-                                  <div className="w-full aspect-square bg-gray-100 overflow-hidden"><img src={imageUrl} alt="" className="w-full h-full object-cover" /></div>
+                                  <div className="w-full aspect-square bg-gray-100 overflow-hidden"><SafeImg src={imageUrl} className="w-full h-full object-cover" /></div>
                                 ) : (
                                   <div className="w-full aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center"><svg className="w-12 h-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V5.25a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v13.5a2.25 2.25 0 002.25 2.25z" /></svg></div>
                                 )}
@@ -2333,7 +2341,7 @@ export default function SocialPage() {
                                       <CarouselPreview slides={carouselSlides!} aspectClass="aspect-video" />
                                     </div>
                                   ) : imageUrl ? (
-                                    <div className="mt-3 rounded-2xl overflow-hidden border border-gray-200"><div className="w-full aspect-video bg-gray-100 overflow-hidden"><img src={imageUrl} alt="" className="w-full h-full object-cover" /></div></div>
+                                    <div className="mt-3 rounded-2xl overflow-hidden border border-gray-200"><div className="w-full aspect-video bg-gray-100 overflow-hidden"><SafeImg src={imageUrl} className="w-full h-full object-cover" /></div></div>
                                   ) : null}
                                   <div className="flex justify-between mt-3 text-gray-500 max-w-[280px]">
                                     {[
@@ -2370,7 +2378,7 @@ export default function SocialPage() {
                                 {hasCarousel ? (
                                   <CarouselPreview slides={carouselSlides!} aspectClass="aspect-[1.91/1]" />
                                 ) : imageUrl ? (
-                                  <div className="w-full aspect-[1.91/1] bg-gray-100 overflow-hidden"><img src={imageUrl} alt="" className="w-full h-full object-cover" /></div>
+                                  <div className="w-full aspect-[1.91/1] bg-gray-100 overflow-hidden"><SafeImg src={imageUrl} className="w-full h-full object-cover" /></div>
                                 ) : null}
                                 <div className="px-4 py-1.5 flex justify-between text-[12px] text-gray-500 border-b border-gray-100">
                                   <span>42 reactions</span><span>3 commentaires</span>
@@ -2397,7 +2405,7 @@ export default function SocialPage() {
                                   </div>
                                 )}
                                 {imageUrl ? (
-                                  <div className={`w-full ${activeDevice === "phone" ? "aspect-[9/16]" : "aspect-video"} overflow-hidden`}><img src={imageUrl} alt="" className="w-full h-full object-cover opacity-90" /></div>
+                                  <div className={`w-full ${activeDevice === "phone" ? "aspect-[9/16]" : "aspect-video"} overflow-hidden`}><SafeImg src={imageUrl} className="w-full h-full object-cover opacity-90" /></div>
                                 ) : (
                                   <div className={`w-full ${activeDevice === "phone" ? "aspect-[9/16]" : "aspect-video"} bg-gradient-to-b from-gray-800 to-gray-950`} />
                                 )}
@@ -2433,7 +2441,7 @@ export default function SocialPage() {
                               <>
                                 {imageUrl ? (
                                   <div className="w-full aspect-[2/3] max-h-[380px] bg-gray-100 overflow-hidden relative">
-                                    <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                                    <SafeImg src={imageUrl} className="w-full h-full object-cover" />
                                     <div className="absolute top-3 right-3">
                                       <button className="bg-red-600 text-white text-[13px] font-bold px-5 py-2 rounded-full shadow-lg">Enregistrer</button>
                                     </div>
