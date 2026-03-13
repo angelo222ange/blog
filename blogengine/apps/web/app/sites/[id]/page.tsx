@@ -404,10 +404,8 @@ function PublishConfigSection({ siteId, userRole }: { siteId: string; userRole?:
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Script de deploiement</label>
                 <select value={deployScript} onChange={(e) => setDeployScript(e.target.value)} className="input w-full text-sm">
                   <option value="">Par defaut (git pull + build)</option>
-                  <option value="git pull origin main && npm run build">git pull + npm run build</option>
-                  <option value="git pull origin main && npm install && npm run build">git pull + npm install + npm run build</option>
-                  <option value="git pull origin main && yarn && yarn build">git pull + yarn + yarn build</option>
-                  <option value="git pull && npm run build">git pull + npm run build (simple)</option>
+                  <option value="git pull origin main && npm install && npm run build">git pull + install + build</option>
+                  <option value={"git pull origin main && npm install --legacy-peer-deps && npm run build && sudo rsync -a --delete out/ /var/www/${REPO_NAME}/ && sudo chown -R www-data:www-data /var/www/${REPO_NAME}"}>git pull + build + rsync (sites statiques)</option>
                   <option value="./deploy.sh">./deploy.sh (script personnalise)</option>
                 </select>
               </div>
