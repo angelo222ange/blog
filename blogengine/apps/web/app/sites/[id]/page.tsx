@@ -223,7 +223,8 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
   );
 }
 
-function PublishConfigSection({ siteId }: { siteId: string }) {
+function PublishConfigSection({ siteId, userRole }: { siteId: string; userRole?: string }) {
+  const isAdmin = userRole === "ADMIN";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -362,54 +363,56 @@ function PublishConfigSection({ siteId }: { siteId: string }) {
             )}
           </div>
 
-          {/* VPS / SSH */}
-          <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-gray-900">Deploiement VPS</p>
-              {hasSSH && <span className="text-xs text-emerald-600 font-semibold">SSH configure</span>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          {/* VPS / SSH — admin only */}
+          {isAdmin && (
+            <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-900">Deploiement VPS</p>
+                {hasSSH && <span className="text-xs text-emerald-600 font-semibold">SSH configure</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Host SSH</label>
+                  <input type="text" value={sshHost} onChange={(e) => setSshHost(e.target.value)}
+                    placeholder="123.45.67.89" className="input w-full font-mono text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">User</label>
+                    <input type="text" value={sshUser} onChange={(e) => setSshUser(e.target.value)}
+                      placeholder="deploy" className="input w-full text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Port</label>
+                    <input type="number" value={sshPort} onChange={(e) => setSshPort(parseInt(e.target.value) || 22)}
+                      className="input w-full text-sm" />
+                  </div>
+                </div>
+              </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Host SSH</label>
-                <input type="text" value={sshHost} onChange={(e) => setSshHost(e.target.value)}
-                  placeholder="123.45.67.89" className="input w-full font-mono text-sm" />
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Cle privee SSH</label>
+                <textarea value={sshPrivateKey} onChange={(e) => setSshPrivateKey(e.target.value)}
+                  placeholder={config.hasSshKey ? "Laisser vide pour garder l'actuelle" : "-----BEGIN OPENSSH PRIVATE KEY-----\n..."}
+                  rows={3} className="input w-full font-mono text-xs resize-none" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">User</label>
-                  <input type="text" value={sshUser} onChange={(e) => setSshUser(e.target.value)}
-                    placeholder="deploy" className="input w-full text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Port</label>
-                  <input type="number" value={sshPort} onChange={(e) => setSshPort(parseInt(e.target.value) || 22)}
-                    className="input w-full text-sm" />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Chemin du projet sur le VPS</label>
+                <input type="text" value={vpsPath} onChange={(e) => setVpsPath(e.target.value)}
+                  placeholder="/home/deploy/repos/mon-site" className="input w-full font-mono text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Script de deploiement</label>
+                <select value={deployScript} onChange={(e) => setDeployScript(e.target.value)} className="input w-full text-sm">
+                  <option value="">Par defaut (git pull + build)</option>
+                  <option value="git pull origin main && npm run build">git pull + npm run build</option>
+                  <option value="git pull origin main && npm install && npm run build">git pull + npm install + npm run build</option>
+                  <option value="git pull origin main && yarn && yarn build">git pull + yarn + yarn build</option>
+                  <option value="git pull && npm run build">git pull + npm run build (simple)</option>
+                  <option value="./deploy.sh">./deploy.sh (script personnalise)</option>
+                </select>
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Cle privee SSH</label>
-              <textarea value={sshPrivateKey} onChange={(e) => setSshPrivateKey(e.target.value)}
-                placeholder={config.hasSshKey ? "Laisser vide pour garder l'actuelle" : "-----BEGIN OPENSSH PRIVATE KEY-----\n..."}
-                rows={3} className="input w-full font-mono text-xs resize-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Chemin du projet sur le VPS</label>
-              <input type="text" value={vpsPath} onChange={(e) => setVpsPath(e.target.value)}
-                placeholder="/home/deploy/repos/mon-site" className="input w-full font-mono text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Script de deploiement</label>
-              <select value={deployScript} onChange={(e) => setDeployScript(e.target.value)} className="input w-full text-sm">
-                <option value="">Par defaut (git pull + build)</option>
-                <option value="git pull origin main && npm run build">git pull + npm run build</option>
-                <option value="git pull origin main && npm install && npm run build">git pull + npm install + npm run build</option>
-                <option value="git pull origin main && yarn && yarn build">git pull + yarn + yarn build</option>
-                <option value="git pull && npm run build">git pull + npm run build (simple)</option>
-                <option value="./deploy.sh">./deploy.sh (script personnalise)</option>
-              </select>
-            </div>
-          </div>
+          )}
 
           {/* Notifications */}
           <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-4">
@@ -582,7 +585,7 @@ export default function SiteDetailPage() {
         </div>
 
         <div className="mb-6"><PublicationModeSection siteId={site.id} /></div>
-        <div className="mb-10"><PublishConfigSection siteId={site.id} /></div>
+        <div className="mb-10"><PublishConfigSection siteId={site.id} userRole={user.role} /></div>
 
         <div className="animate-fade-in">
           <h2 className="text-xl font-bold text-gray-900 mb-5">Articles</h2>

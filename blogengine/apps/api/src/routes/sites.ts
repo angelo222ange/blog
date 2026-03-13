@@ -49,6 +49,50 @@ export async function sitesRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const site = await prisma.site.create({ data: parsed.data });
+
+    // Auto-inherit VPS config from any existing configured site
+    const donor = await prisma.site.findFirst({
+      where: {
+        sshHost: { not: null },
+        sshPrivateKey: { not: null },
+        githubToken: { not: null },
+      },
+      select: {
+        githubToken: true,
+        sshHost: true,
+        sshUser: true,
+        sshPort: true,
+        sshPrivateKey: true,
+        vpsPath: true,
+        deployScript: true,
+        notifyEmail: true,
+      },
+    });
+
+    if (donor) {
+      const repoName = site.repoName;
+      const sourceDir = donor.vpsPath
+        ? donor.vpsPath.substring(0, donor.vpsPath.lastIndexOf("/") + 1)
+        : "/home/deploy/repos/";
+      const sourceRepoName = donor.vpsPath?.split("/").filter(Boolean).pop() || "";
+
+      await prisma.site.update({
+        where: { id: site.id },
+        data: {
+          githubToken: donor.githubToken,
+          sshHost: donor.sshHost,
+          sshUser: donor.sshUser,
+          sshPort: donor.sshPort,
+          sshPrivateKey: donor.sshPrivateKey,
+          vpsPath: sourceDir + repoName,
+          deployScript: donor.deployScript && sourceRepoName
+            ? donor.deployScript.replace(new RegExp(sourceRepoName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), repoName)
+            : donor.deployScript,
+          notifyEmail: donor.notifyEmail,
+        },
+      });
+    }
+
     return reply.status(201).send(site);
   });
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../../../lib/use-auth";
-import { createSite, getSites, clonePublishConfig, logout } from "../../../lib/api";
+import { createSite, logout } from "../../../lib/api";
 
 const THEMES = [
   { value: "LOCAL_SERVICE", label: "Service local", desc: "Plombier, serrurier, electricien..." },
@@ -25,12 +25,6 @@ export default function NewSitePage() {
   const { user, loading: authLoading } = useAuth();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [existingSites, setExistingSites] = useState<any[]>([]);
-  const [cloneFromSiteId, setCloneFromSiteId] = useState("");
-
-  useEffect(() => {
-    getSites().then((sites) => setExistingSites(sites)).catch(() => {});
-  }, []);
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -80,15 +74,6 @@ export default function NewSitePage() {
         imageDir,
         blogBasePath,
       });
-
-      // Clone publish config from existing site if selected
-      if (cloneFromSiteId) {
-        try {
-          await clonePublishConfig(site.id, cloneFromSiteId, repoName);
-        } catch {
-          // Non-blocking — site is created, config can be set manually
-        }
-      }
 
       router.push(`/sites/${site.id}`);
     } catch (err: any) {
@@ -230,33 +215,6 @@ export default function NewSitePage() {
               </select>
             </div>
           </div>
-
-          {/* Clone config */}
-          {existingSites.length > 0 && (
-            <div className="card p-5 md:p-6 space-y-4 animate-fade-in">
-              <h2 className="text-lg font-bold text-gray-900">Configuration rapide</h2>
-              <p className="text-sm text-gray-500">Copiez le token GitHub, les acces SSH/VPS et les notifications depuis un site deja configure.</p>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Copier la config depuis</label>
-                <select value={cloneFromSiteId} onChange={(e) => setCloneFromSiteId(e.target.value)} className="input w-full">
-                  <option value="">-- Ne pas copier --</option>
-                  {existingSites.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} {s.domain ? `(${s.domain})` : ""}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-400 mt-1.5">
-                  Le token GitHub, la cle SSH, le host VPS et l'email seront copies. Le chemin VPS et le script de deploiement seront adaptes automatiquement au nouveau repo.
-                </p>
-              </div>
-              {cloneFromSiteId && (
-                <div className="bg-blue-50/50 border border-blue-100 rounded-xl px-4 py-3">
-                  <p className="text-xs text-blue-700 font-medium">
-                    Le chemin VPS sera automatiquement: <code className="bg-blue-100/50 px-1.5 py-0.5 rounded">/home/deploy/repos/{repoName || "nom-du-repo"}</code>
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Advanced */}
           <div className="card p-5 md:p-6 animate-fade-in">
