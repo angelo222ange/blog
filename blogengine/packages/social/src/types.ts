@@ -121,6 +121,25 @@ export interface GeneratedPost {
   carouselSlides?: CarouselSlide[];
 }
 
+export interface TopPerformerData {
+  platform: string;
+  content: string;
+  engagementRate: number;
+  impressions: number;
+  likes: number;
+  comments: number;
+  shares: number;
+}
+
+export interface NicheTrendData {
+  platform: string;
+  content: string;
+  engagementRate: number;
+  likes: number;
+  shares: number;
+  authorName: string;
+}
+
 export interface ArticleForSocial {
   title: string;
   metaDescription: string;

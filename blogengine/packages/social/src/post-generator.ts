@@ -4,7 +4,7 @@
  */
 import OpenAI from "openai";
 import type { SocialPlatform } from "@blogengine/core";
-import type { ArticleForSocial, GeneratedPost } from "./types.js";
+import type { ArticleForSocial, GeneratedPost, TopPerformerData, NicheTrendData } from "./types.js";
 import { SOCIAL_SYSTEM_PROMPT, buildSocialUserPrompt } from "./prompts/social-prompts.js";
 import { PLATFORM_CONSTRAINTS } from "./types.js";
 
@@ -12,7 +12,7 @@ export async function generateSocialPosts(
   article: ArticleForSocial,
   platforms: SocialPlatform[],
   apiKey: string,
-  options?: { carousel?: boolean },
+  options?: { carousel?: boolean; topPerformers?: TopPerformerData[]; nicheTrends?: NicheTrendData[] },
 ): Promise<GeneratedPost[]> {
   if (platforms.length === 0) return [];
 

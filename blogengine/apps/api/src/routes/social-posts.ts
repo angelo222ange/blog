@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { SocialPlatform } from "@blogengine/core";
 import { generateSocialPostsSchema, updateSocialPostSchema } from "@blogengine/core";
-import { generateSocialPosts, getPlatformClient, decrypt } from "@blogengine/social";
-import type { ArticleForSocial } from "@blogengine/social";
+import { generateSocialPosts, getPlatformClient, decrypt, fetchMetrics, crawlNicheTrends, getNicheTrendsForSite } from "@blogengine/social";
+import type { ArticleForSocial, TopPerformerData, NicheTrendData } from "@blogengine/social";
 import { prisma } from "../lib/prisma.js";
 import { authGuard } from "../lib/auth.js";
 import { sendSuccessNotification, sendErrorNotification, formatSocialPublishSuccess, formatSocialPublishError } from "../lib/notify.js";
@@ -361,8 +361,55 @@ async function findPostImage(
   return null;
 }
 
+/** Fetch top performing posts for a site to inject into AI prompt */
+async function getTopPerformers(siteId: string, limit = 5): Promise<TopPerformerData[]> {
+  const topMetrics = await prisma.socialPostMetrics.findMany({
+    where: {
+      socialPost: { siteId },
+      engagementRate: { gt: 0 },
+    },
+    orderBy: { engagementRate: "desc" },
+    take: limit,
+    include: { socialPost: { select: { platform: true, content: true } } },
+  });
+  return topMetrics.map((m) => ({
+    platform: m.socialPost.platform,
+    content: m.socialPost.content,
+    engagementRate: m.engagementRate,
+    impressions: m.impressions,
+    likes: m.likes,
+    comments: m.comments,
+    shares: m.shares,
+  }));
+}
+
 export async function socialPostsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authGuard);
+
+  // ─── Niche Trend Crawling ───
+
+  // Crawl niche trends for a site
+  app.post<{ Params: { siteId: string } }>(
+    "/crawl-trends/:siteId",
+    async (request, reply) => {
+      const site = await prisma.site.findUnique({
+        where: { id: request.params.siteId },
+      });
+      if (!site) return reply.status(404).send({ error: "Site introuvable" });
+
+      const result = await crawlNicheTrends(prisma, site.id, site.name, site.theme, site.city);
+      return result;
+    },
+  );
+
+  // Get cached niche trends for a site
+  app.get<{ Params: { siteId: string } }>(
+    "/niche-trends/:siteId",
+    async (request, reply) => {
+      const trends = await getNicheTrendsForSite(prisma, request.params.siteId);
+      return trends;
+    },
+  );
 
   // Generate social posts for an article (rate limited - costs money via AI APIs)
   app.post<{ Params: { articleId: string } }>(
@@ -425,9 +472,15 @@ export async function socialPostsRoutes(app: FastifyInstance) {
           : undefined,
       };
 
+      // Fetch top performers for AI optimization
+      const topPerformers = await getTopPerformers(article.siteId);
+
+      // Fetch niche trends
+      const nicheTrends = await getNicheTrendsForSite(prisma, article.siteId);
+
       // Generate posts via LLM
       const apiKey = process.env.OPENAI_API_KEY || "";
-      const generatedPosts = await generateSocialPosts(articleForSocial, platforms, apiKey);
+      const generatedPosts = await generateSocialPosts(articleForSocial, platforms, apiKey, { topPerformers: topPerformers.length > 0 ? topPerformers : undefined, nicheTrends: nicheTrends.length > 0 ? nicheTrends : undefined });
 
       // Get social config for auto-publish mode
       const socialConfig = await prisma.socialConfig.findUnique({
@@ -531,8 +584,14 @@ export async function socialPostsRoutes(app: FastifyInstance) {
         siteDescription: `${site.name}${site.city ? ` base a ${site.city}` : ""} - secteur : ${site.theme}${site.domain ? ` - site : ${site.domain}` : ""}`,
       };
 
+      // Fetch top performers for AI optimization
+      const topPerformers = await getTopPerformers(site.id);
+
+      // Fetch niche trends
+      const nicheTrends = await getNicheTrendsForSite(prisma, site.id);
+
       const apiKey = process.env.OPENAI_API_KEY || "";
-      const generatedPosts = await generateSocialPosts(articleForSocial, platforms, apiKey, { carousel: isCarousel });
+      const generatedPosts = await generateSocialPosts(articleForSocial, platforms, apiKey, { carousel: isCarousel, topPerformers: topPerformers.length > 0 ? topPerformers : undefined, nicheTrends: nicheTrends.length > 0 ? nicheTrends : undefined });
 
       // Get existing image URLs used on this site to avoid duplicates
       const existingPosts = await prisma.socialPost.findMany({
@@ -743,6 +802,185 @@ export async function socialPostsRoutes(app: FastifyInstance) {
     async (request, reply) => {
       await prisma.socialPost.delete({ where: { id: request.params.postId } });
       return { ok: true };
+    },
+  );
+
+  // ─── Metrics Endpoints ───
+
+  // Fetch metrics for a single post
+  app.post<{ Params: { postId: string } }>(
+    "/:postId/fetch-metrics",
+    async (request, reply) => {
+      const post = await prisma.socialPost.findUnique({
+        where: { id: request.params.postId },
+        include: { socialAccount: true },
+      });
+      if (!post) return reply.status(404).send({ error: "Post introuvable" });
+      if (post.status !== "PUBLISHED" || !post.platformPostId) {
+        return reply.status(400).send({ error: "Le post doit etre publie avec un ID plateforme" });
+      }
+
+      const accessToken = decrypt(post.socialAccount.accessToken);
+      const metadata = post.socialAccount.metadata ? JSON.parse(post.socialAccount.metadata) : {};
+      const metrics = await fetchMetrics(post.platform, accessToken, post.platformPostId, metadata);
+
+      if (!metrics) {
+        return reply.status(400).send({ error: `Metriques non disponibles pour ${post.platform}` });
+      }
+
+      const saved = await prisma.socialPostMetrics.create({
+        data: {
+          socialPostId: post.id,
+          impressions: metrics.impressions,
+          reach: metrics.reach,
+          engagement: metrics.engagement,
+          likes: metrics.likes,
+          comments: metrics.comments,
+          shares: metrics.shares,
+          saves: metrics.saves,
+          clicks: metrics.clicks,
+          engagementRate: metrics.engagementRate,
+          rawData: JSON.stringify(metrics.rawData),
+        },
+      });
+
+      return saved;
+    },
+  );
+
+  // Fetch metrics for all published posts of a site
+  app.post<{ Params: { siteId: string } }>(
+    "/fetch-metrics-site/:siteId",
+    async (request, reply) => {
+      const posts = await prisma.socialPost.findMany({
+        where: {
+          siteId: request.params.siteId,
+          status: "PUBLISHED",
+          platformPostId: { not: null },
+        },
+        include: { socialAccount: true },
+      });
+
+      const results: Array<{ postId: string; platform: string; success: boolean; error?: string }> = [];
+
+      for (const post of posts) {
+        try {
+          const accessToken = decrypt(post.socialAccount.accessToken);
+          const metadata = post.socialAccount.metadata ? JSON.parse(post.socialAccount.metadata) : {};
+          const metrics = await fetchMetrics(post.platform, accessToken, post.platformPostId!, metadata);
+
+          if (metrics) {
+            await prisma.socialPostMetrics.create({
+              data: {
+                socialPostId: post.id,
+                impressions: metrics.impressions,
+                reach: metrics.reach,
+                engagement: metrics.engagement,
+                likes: metrics.likes,
+                comments: metrics.comments,
+                shares: metrics.shares,
+                saves: metrics.saves,
+                clicks: metrics.clicks,
+                engagementRate: metrics.engagementRate,
+                rawData: JSON.stringify(metrics.rawData),
+              },
+            });
+            results.push({ postId: post.id, platform: post.platform, success: true });
+          } else {
+            results.push({ postId: post.id, platform: post.platform, success: false, error: "Non supporte" });
+          }
+        } catch (err: any) {
+          results.push({ postId: post.id, platform: post.platform, success: false, error: err.message });
+        }
+      }
+
+      return { total: posts.length, results };
+    },
+  );
+
+  // Get metrics summary for a site
+  app.get<{ Params: { siteId: string } }>(
+    "/metrics-summary/:siteId",
+    async (request, reply) => {
+      // Get latest metrics for each post (most recent fetchedAt)
+      const posts = await prisma.socialPost.findMany({
+        where: {
+          siteId: request.params.siteId,
+          status: "PUBLISHED",
+        },
+        include: {
+          metrics: {
+            orderBy: { fetchedAt: "desc" },
+            take: 1,
+          },
+          socialAccount: { select: { accountName: true } },
+        },
+        orderBy: { publishedAt: "desc" },
+      });
+
+      const postsWithMetrics = posts
+        .filter((p) => p.metrics.length > 0)
+        .map((p) => ({
+          id: p.id,
+          platform: p.platform,
+          content: p.content,
+          publishedAt: p.publishedAt,
+          platformUrl: p.platformUrl,
+          accountName: p.socialAccount.accountName,
+          metrics: p.metrics[0]!,
+        }));
+
+      // Aggregates
+      let totalImpressions = 0;
+      let totalEngagement = 0;
+      let totalLikes = 0;
+      let totalComments = 0;
+      let totalShares = 0;
+      const platformStats: Record<string, { impressions: number; engagement: number; count: number }> = {};
+
+      for (const p of postsWithMetrics) {
+        const m = p.metrics;
+        totalImpressions += m.impressions;
+        totalEngagement += m.engagement;
+        totalLikes += m.likes;
+        totalComments += m.comments;
+        totalShares += m.shares;
+
+        if (!platformStats[p.platform]) {
+          platformStats[p.platform] = { impressions: 0, engagement: 0, count: 0 };
+        }
+        platformStats[p.platform]!.impressions += m.impressions;
+        platformStats[p.platform]!.engagement += m.engagement;
+        platformStats[p.platform]!.count += 1;
+      }
+
+      const avgEngagementRate = postsWithMetrics.length > 0
+        ? Math.round((postsWithMetrics.reduce((sum, p) => sum + p.metrics.engagementRate, 0) / postsWithMetrics.length) * 100) / 100
+        : 0;
+
+      // Find best platform by avg engagement rate
+      let bestPlatform = "-";
+      let bestRate = 0;
+      for (const [platform, stats] of Object.entries(platformStats)) {
+        const rate = stats.count > 0 ? stats.engagement / Math.max(stats.impressions, 1) * 100 : 0;
+        if (rate > bestRate) {
+          bestRate = rate;
+          bestPlatform = platform;
+        }
+      }
+
+      return {
+        totalImpressions,
+        totalEngagement,
+        totalLikes,
+        totalComments,
+        totalShares,
+        avgEngagementRate,
+        bestPlatform,
+        bestPlatformRate: Math.round(bestRate * 100) / 100,
+        postsTracked: postsWithMetrics.length,
+        posts: postsWithMetrics,
+      };
     },
   );
 }

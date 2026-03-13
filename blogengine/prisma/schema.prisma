@@ -65,6 +65,7 @@ model Site {
   socialAccounts SocialAccount[]
   socialConfig   SocialConfig?
   socialPosts    SocialPost[]    @relation("SiteSocialPosts")
+  nicheTrends    NicheTrend[]
 }
 
 model SiteImage {
@@ -198,9 +199,50 @@ model SocialPost {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   carouselData    String?
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  site            Site?         @relation("SiteSocialPosts", fields: [siteId], references: [id], onDelete: Cascade)
-  article         Article?      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  socialAccount   SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  site            Site?            @relation("SiteSocialPosts", fields: [siteId], references: [id], onDelete: Cascade)
+  article         Article?         @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  metrics         SocialPostMetrics[]
+}
+
+model SocialPostMetrics {
+  id              String     @id @default(cuid())
+  socialPostId    String
+  impressions     Int        @default(0)
+  reach           Int        @default(0)
+  engagement      Int        @default(0)
+  likes           Int        @default(0)
+  comments        Int        @default(0)
+  shares          Int        @default(0)
+  saves           Int        @default(0)
+  clicks          Int        @default(0)
+  engagementRate  Float      @default(0)
+  rawData         String?
+  fetchedAt       DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  socialPost      SocialPost @relation(fields: [socialPostId], references: [id], onDelete: Cascade)
+}
+
+model NicheTrend {
+  id             String   @id @default(cuid())
+  siteId         String
+  platform       String
+  externalPostId String
+  authorName     String   @default("")
+  content        String
+  engagementRate Float    @default(0)
+  impressions    Int      @default(0)
+  likes          Int      @default(0)
+  comments       Int      @default(0)
+  shares         Int      @default(0)
+  searchQuery    String   @default("")
+  postedAt       DateTime @default(now())
+  crawledAt      DateTime @default(now())
+  expiresAt      DateTime
+  site           Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, platform, externalPostId])
 }
 
 model SocialConfig {

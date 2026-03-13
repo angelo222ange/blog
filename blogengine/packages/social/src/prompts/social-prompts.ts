@@ -1,6 +1,6 @@
 import type { SocialPlatform } from "@blogengine/core";
 import { PLATFORM_CONSTRAINTS } from "../types.js";
-import type { ArticleForSocial } from "../types.js";
+import type { ArticleForSocial, TopPerformerData, NicheTrendData } from "../types.js";
 
 // ─── LinkedIn Copywriting (based on analysis of top FR creators: Dorian RI, Moubeche, Dufraisse) ───
 
@@ -172,7 +172,7 @@ ${IMAGE_PROMPT_GUIDELINES}`;
 export function buildSocialUserPrompt(
   article: ArticleForSocial,
   platforms: SocialPlatform[],
-  options?: { carousel?: boolean },
+  options?: { carousel?: boolean; topPerformers?: TopPerformerData[]; nicheTrends?: NicheTrendData[] },
 ): string {
   const idealLengths: Record<string, string> = {
     twitter: "200-250 chars (ULTRA COURT, 1 phrase max)",
@@ -316,6 +316,30 @@ Exemple de structure JSON :
   ]
 }` : ""}
 
+${options?.topPerformers && options.topPerformers.length > 0 ? `
+OPTIMISATION BASEE SUR LES DONNEES :
+Voici les ${options.topPerformers.length} posts les plus performants de ce compte. Analyse leur style, ton et structure pour reproduire ce qui fonctionne :
+${options.topPerformers.map((p, i) => `${i + 1}. [${p.platform.toUpperCase()}] Taux engagement: ${p.engagementRate}% | ${p.impressions} impressions | ${p.likes} likes, ${p.comments} commentaires, ${p.shares} partages
+   Contenu: "${p.content.slice(0, 200)}${p.content.length > 200 ? "..." : ""}"`).join("\n")}
+
+CONSIGNES D'OPTIMISATION :
+- Reproduis le ton et la structure des posts qui ont le meilleur taux d'engagement
+- Si les posts courts performent mieux, privilegie la concision
+- Si les posts avec questions performent mieux, inclus des questions
+- Adapte le style a ce qui FONCTIONNE pour ce compte specifique
+` : ""}
+${options?.nicheTrends && options.nicheTrends.length > 0 ? `
+TENDANCES DU SECTEUR :
+Voici les posts les plus performants dans cette niche en ce moment. Inspire-toi de leur angle, ton et structure pour coller aux tendances actuelles. NE COPIE PAS le contenu — utilise-les comme source d'inspiration pour le style et les sujets qui marchent :
+${options.nicheTrends.map((t, i) => `${i + 1}. [${t.platform.toUpperCase()}] par ${t.authorName} | ${t.engagementRate}% engagement | ${t.likes} likes, ${t.shares} partages
+   "${t.content.slice(0, 250)}${t.content.length > 250 ? "..." : ""}"`).join("\n")}
+
+CONSIGNES D'UTILISATION DES TENDANCES :
+- Identifie les ANGLES et FORMATS qui performent (questions, stats, listes, controverses)
+- Adapte le TON de ce qui marche le mieux a ta marque
+- Rebondis sur les SUJETS tendance de la niche si pertinent
+- NE COPIE JAMAIS le contenu mot pour mot — inspire-toi uniquement du style
+` : ""}
 REGLE CRITIQUE - LONGUEUR PAR PLATEFORME :
 Chaque plateforme a sa propre longueur IDEALE. Ne genere PAS le meme texte reformule.
 - Twitter/X : 200-250 chars MAX. Une phrase percutante, c'est TOUT.

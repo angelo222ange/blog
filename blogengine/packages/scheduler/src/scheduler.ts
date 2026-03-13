@@ -346,6 +346,54 @@ async function resetDailyCounters(): Promise<void> {
 }
 
 /**
+ * Crawl niche trends for all active sites via the API endpoint.
+ */
+async function crawlTrendsForAllSites(): Promise<void> {
+  try {
+    const token = await getAuthToken();
+    const res = await fetch(`http://localhost:${apiPort}/api/sites`, {
+      headers: { Cookie: `token=${token}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return;
+
+    const sites = (await res.json()) as any[];
+    let crawled = 0;
+
+    for (const site of sites) {
+      if (!site.isActive) continue;
+      try {
+        console.log(`[scheduler] Crawling trends for ${site.name}...`);
+        const crawlRes = await fetch(
+          `http://localhost:${apiPort}/api/social-posts/crawl-trends/${site.id}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Cookie: `token=${token}` },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(60000),
+          },
+        );
+        if (crawlRes.ok) {
+          const result = await crawlRes.json() as any;
+          if (!result.skipped) crawled++;
+          console.log(
+            `[scheduler] Trends for ${site.name}: ${result.trendsFound} found${result.skipped ? " (skipped)" : ""}`,
+          );
+        }
+      } catch (err: any) {
+        console.error(`[scheduler] Trend crawl failed for ${site.name}: ${err.message}`);
+      }
+    }
+
+    if (crawled > 0) {
+      console.log(`[scheduler] Trend crawl complete: ${crawled} site(s) crawled`);
+    }
+  } catch (err: any) {
+    console.error(`[scheduler] Trend crawl error: ${err.message}`);
+  }
+}
+
+/**
  * Start the scheduler. Runs every minute to check active schedules.
  */
 export function startScheduler(port: number = 4000): void {
@@ -370,6 +418,13 @@ export function startScheduler(port: number = 4000): void {
   cron.schedule("0 0 * * *", () => {
     resetDailyCounters().catch((err) => {
       console.error(`[scheduler] Reset error: ${err.message}`);
+    });
+  }, { timezone: "Europe/Paris" });
+
+  // Crawl niche trends daily at 6:00 Paris time
+  cron.schedule("0 6 * * *", () => {
+    crawlTrendsForAllSites().catch((err) => {
+      console.error(`[scheduler] Trend crawl error: ${err.message}`);
     });
   }, { timezone: "Europe/Paris" });
 

@@ -157,9 +157,18 @@ export async function motionRoutes(app: FastifyInstance) {
       // Resolve slide images from Pexels
       config.slides = await resolveSlideImages(config.slides);
 
+      // Strip internal file paths before sending to frontend
+      const safeConfig = {
+        ...config,
+        slides: config.slides.map((s: any) => {
+          const { imageFilePath, ...rest } = s;
+          return rest;
+        }),
+      };
+
       return {
         success: true,
-        config,
+        config: safeConfig,
         templateId: templateId || null,
         estimatedDuration: `${(config.slides.reduce((s, sl) => s + sl.durationFrames, 0) / config.fps).toFixed(1)}s`,
       };
@@ -192,9 +201,9 @@ export async function motionRoutes(app: FastifyInstance) {
         ...config,
         slides: config.slides.map((s: any) => ({
           ...s,
-          imageUrl: s.imageFilePath || (s.imageUrl?.startsWith("/uploads/")
+          imageUrl: s.imageUrl?.startsWith("/uploads/")
             ? join(process.cwd(), "public", s.imageUrl)
-            : s.imageUrl),
+            : s.imageUrl,
         })),
       };
       const filename = `motion-${Date.now()}.${config.outputFormat || "mp4"}`;
@@ -307,10 +316,19 @@ export async function motionRoutes(app: FastifyInstance) {
         filename,
       });
 
+      // Strip internal file paths before sending to frontend
+      const safeConfig2 = {
+        ...config,
+        slides: config.slides.map((s: any) => {
+          const { imageFilePath, ...rest } = s;
+          return rest;
+        }),
+      };
+
       return {
         success: true,
         videoUrl: `/uploads/motion/${filename}`,
-        config,
+        config: safeConfig2,
         durationMs: result.durationMs,
         sizeBytes: result.sizeBytes,
       };
