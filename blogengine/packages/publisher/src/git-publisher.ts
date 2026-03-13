@@ -206,7 +206,7 @@ export class GitPublisher {
       };
       await git.env(envVars).clone(repoUrl, workDir, ["--depth", "1", "--branch", site.branch || "main"]);
 
-      const repoGit = simpleGit(workDir);
+      const repoGit = simpleGit(workDir).env(envVars);
 
       // ── Step 2: Duplicate check - verify slug doesn't exist ──
       const indexPath = path.join(workDir, site.contentDir, "articles.json");
