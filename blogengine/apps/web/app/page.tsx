@@ -2,10 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { getSites, logout, getMe, getSocialAccounts, getDashboardStats, markOnboarded } from "../lib/api";
+import { getSites, getMe, getSocialAccounts, getDashboardStats, markOnboarded } from "../lib/api";
 import GuidedTour from "../components/GuidedTour";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { CheckIcon } from "lucide-react";
+import NavbarDropdown from "../components/NavbarDropdown";
 
 // ─── Social Platform SVG Icons ───
 
@@ -53,108 +52,7 @@ function TikTokIcon({ size = 20 }: { size?: number }) {
   return <img src="/icons/tiktok.svg" alt="TikTok" width={size} height={size} className="object-contain" />;
 }
 
-// ─── Navbar ───
-
-const NAV_LINKS = [
-  { href: "/", label: "Dashboard", active: true },
-  { href: "/social", label: "Reseaux" },
-];
-
-function Navbar({ user }: { user: { email: string; name: string } }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  return (
-    <div className="sticky top-0 z-50 px-2 md:px-4 pt-2 md:pt-4">
-      <nav className="max-w-6xl mx-auto px-3 md:px-6 h-14 flex items-center justify-between rounded-2xl navbar-float">
-        <div className="flex items-center gap-4 md:gap-8">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <img src="/favicon.png" alt="Zuply" className="w-7 h-7 object-contain" />
-            <span className="text-xl font-bold tracking-tight" style={{ color: "#2563eb" }}>zuply</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  link.active
-                    ? "text-gray-900 bg-white/60"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-white/40"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 md:gap-4">
-          <span className="hidden md:inline text-sm text-gray-500 font-medium">{user.name || user.email}</span>
-          <button
-            onClick={() => { logout().catch(() => {}).finally(() => { window.location.href = "/login"; }); }}
-            className="hidden md:inline text-sm text-gray-400 hover:text-gray-900 font-medium transition-colors"
-          >
-            Deconnexion
-          </button>
-          <div className="relative w-fit">
-            <Avatar className="ring-offset-background ring-2 ring-teal-600 ring-offset-2 h-8 w-8">
-              <AvatarImage
-                src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || user.email)}`}
-                alt={user.name || user.email}
-              />
-              <AvatarFallback className="text-xs bg-blue-50 text-blue-600 font-bold">
-                {(user.name || user.email).slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-teal-600">
-              <CheckIcon className="size-2.5 text-white" />
-            </span>
-          </div>
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/40 transition-colors"
-            aria-label="Menu"
-          >
-            <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
-      </nav>
-      {/* Mobile dropdown menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden max-w-6xl mx-auto mt-1 rounded-xl navbar-float px-3 py-3 space-y-1">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                link.active
-                  ? "text-gray-900 bg-white/60"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-white/40"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <div className="border-t border-gray-200/50 pt-2 mt-2">
-            <span className="block px-3 py-1 text-sm text-gray-500 font-medium">{user.name || user.email}</span>
-            <button
-              onClick={() => { logout().catch(() => {}).finally(() => { window.location.href = "/login"; }); }}
-              className="block w-full text-left px-3 py-2 text-sm text-gray-400 hover:text-gray-900 font-medium transition-colors"
-            >
-              Deconnexion
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// ─── Navbar (shared component) ───
 
 // ─── Smooth Bezier helper ───
 
@@ -695,7 +593,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-white bg-orbs">
-      <Navbar user={user} />
+      <NavbarDropdown user={user} />
 
       <main className="max-w-6xl mx-auto px-3 md:px-6 py-6 md:py-10">
         {/* Welcome + Stats */}

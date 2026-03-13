@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../../../lib/use-auth";
-import { getSite, generateArticle, getSchedule, updateSchedule, getPublishConfig, updatePublishConfig, logout } from "../../../lib/api";
+import NavbarDropdown from "../../../components/NavbarDropdown";
+import { getSite, generateArticle, getSchedule, updateSchedule, getPublishConfig, updatePublishConfig } from "../../../lib/api";
 
 const BADGE_MAP: Record<string, string> = {
   REVIEW: "badge-review", APPROVED: "badge-approved", PUBLISHED: "badge-published",
@@ -16,56 +17,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge ${BADGE_MAP[status] || "badge-draft"}`}>{status}</span>;
 }
 
-function Navbar({ user }: { user: { email: string; name: string } }) {
-  const router = useRouter();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  return (
-    <div className="sticky top-0 z-50 px-2 md:px-4 pt-2 md:pt-4">
-      <nav className="navbar-float max-w-6xl mx-auto px-3 md:px-6 h-12 md:h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3 md:gap-8">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity"><img src="/favicon.png" alt="Zuply" className="w-6 h-6 md:w-7 md:h-7 object-contain" /><span className="text-lg md:text-xl font-bold tracking-tight" style={{ color: "#2563eb" }}>zuply</span></Link>
-          <div className="hidden md:flex items-center gap-1">
-            <Link href="/" className="px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-900 hover:bg-white/30 transition-all">Dashboard</Link>
-            <Link href="/social" className="px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-900 hover:bg-white/30 transition-all">Reseaux</Link>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 md:gap-5">
-          <span className="hidden md:inline text-sm text-gray-500 font-medium">{user.name || user.email}</span>
-          <button
-            onClick={async () => { try { await logout(); } catch {} router.replace("/login"); }}
-            className="hidden md:inline text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors"
-          >Deconnexion</button>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white/30 transition-all"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              {mobileMenuOpen
-                ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                : <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              }
-            </svg>
-          </button>
-        </div>
-      </nav>
-      {mobileMenuOpen && (
-        <div className="md:hidden navbar-float max-w-6xl mx-auto mt-1 px-3 py-3 rounded-xl animate-fade-in">
-          <div className="flex flex-col gap-1">
-            <Link href="/" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-900 hover:bg-white/30 transition-all" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
-            <Link href="/social" className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-900 hover:bg-white/30 transition-all" onClick={() => setMobileMenuOpen(false)}>Reseaux</Link>
-          </div>
-          <div className="border-t border-gray-200/30 mt-2 pt-2 flex items-center justify-between px-3">
-            <span className="text-sm text-gray-500 font-medium truncate">{user.name || user.email}</span>
-            <button
-              onClick={async () => { try { await logout(); } catch {} router.replace("/login"); }}
-              className="text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors shrink-0 ml-3"
-            >Deconnexion</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// Navbar replaced by shared NavbarDropdown component
 
 function PublicationModeSection({ siteId }: { siteId: string }) {
   const [loading, setLoading] = useState(true);
@@ -495,7 +447,7 @@ export default function SiteDetailPage() {
   if (!site) {
     return (
       <div className="min-h-screen bg-white bg-orbs">
-        <Navbar user={user} />
+        <NavbarDropdown user={user} />
         <main className="max-w-6xl mx-auto px-3 md:px-6 py-10 relative z-10">
           <p className="text-gray-500">Site introuvable.</p>
           <Link href="/" className="text-blue-600 text-sm font-medium mt-4 inline-block hover:underline">Retour</Link>
@@ -506,7 +458,7 @@ export default function SiteDetailPage() {
 
   return (
     <div className="min-h-screen bg-white bg-orbs">
-      <Navbar user={user} />
+      <NavbarDropdown user={user} />
       <main className="max-w-6xl mx-auto px-3 md:px-6 py-6 md:py-10 relative z-10">
         <Link href="/" className="text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors mb-6 inline-flex items-center gap-1.5">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>

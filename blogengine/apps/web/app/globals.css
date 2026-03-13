@@ -369,3 +369,80 @@ input:-webkit-autofill:focus {
   border-radius: 3px;
   animation: loader-bar 1.4s ease-in-out infinite;
 }
+
+/* ═══════════════════════════════════════
+   SIGN-IN PAGE ANIMATIONS
+   ═══════════════════════════════════════ */
+
+@keyframes signinFadeSlideIn {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0px);
+  }
+}
+
+@keyframes signinSlideRightIn {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateX(0px);
+  }
+}
+
+@keyframes signinTestimonialIn {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0px) scale(1);
+  }
+}
+
+.animate-signin-element {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateY(16px);
+  animation: signinFadeSlideIn 0.6s ease-out forwards;
+}
+
+.animate-signin-slide-right {
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateX(40px);
+  animation: signinSlideRightIn 0.7s ease-out forwards;
+}
+
+.animate-signin-testimonial {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateY(20px) scale(0.95);
+  animation: signinTestimonialIn 0.5s ease-out forwards;
+}
+
+.animate-signin-delay-100 { animation-delay: 0.1s; }
+.animate-signin-delay-200 { animation-delay: 0.2s; }
+.animate-signin-delay-300 { animation-delay: 0.3s; }
+.animate-signin-delay-400 { animation-delay: 0.4s; }
+.animate-signin-delay-500 { animation-delay: 0.5s; }
+.animate-signin-delay-600 { animation-delay: 0.6s; }
+.animate-signin-delay-700 { animation-delay: 0.7s; }
+.animate-signin-delay-800 { animation-delay: 0.8s; }
+.animate-signin-delay-900 { animation-delay: 0.9s; }
+.animate-signin-delay-1000 { animation-delay: 1.0s; }
+.animate-signin-delay-1200 { animation-delay: 1.2s; }
+.animate-signin-delay-1400 { animation-delay: 1.4s; }

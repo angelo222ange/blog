@@ -11,6 +11,7 @@
   "dependencies": {
     "@blogengine/core": "*",
     "@radix-ui/react-avatar": "^1.1.11",
+    "@supabase/supabase-js": "^2.99.1",
     "@types/dompurify": "^3.0.5",
     "clsx": "^2.1.1",
     "dompurify": "^3.3.3",

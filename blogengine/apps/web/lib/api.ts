@@ -34,6 +34,12 @@ export const login = (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   });
 
+export const oauthLogin = (data: { email: string; name: string; provider: string; providerId: string }) =>
+  request("/auth/oauth-login", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
 export const logout = () =>
   request("/auth/logout", { method: "POST" });
 
@@ -42,6 +48,24 @@ export const getMe = () =>
 
 export const markOnboarded = () =>
   request("/auth/onboarded", { method: "POST", body: JSON.stringify({}) });
+
+export const updateMe = (data: { name: string }) =>
+  request("/auth/me", { method: "PATCH", body: JSON.stringify(data) });
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  request("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+export const getUsers = () =>
+  request<any[]>("/auth/users");
+
+export const createUser = (data: { email: string; name?: string; role?: string; password: string }) =>
+  request("/auth/users", { method: "POST", body: JSON.stringify(data) });
+
+export const deleteUser = (id: string) =>
+  request(`/auth/users/${id}`, { method: "DELETE", body: JSON.stringify({}) });
 
 // Sites
 export const getSites = () =>
