@@ -12,6 +12,7 @@ import { mkdirSync, existsSync, writeFileSync } from "node:fs";
 
 const UPLOADS_DIR = join(process.cwd(), "public", "uploads", "motion");
 const MOTION_IMAGES_DIR = join(process.cwd(), "public", "uploads", "motion-images");
+const API_PORT = Number(process.env.API_PORT) || 4000;
 
 /**
  * Resolve imagePrompt fields on slides into actual imageUrl paths.
@@ -196,13 +197,13 @@ export async function motionRoutes(app: FastifyInstance) {
     }
 
     try {
-      // Convert web URLs to absolute file paths for Remotion rendering
+      // Convert web paths to HTTP URLs for Remotion (headless Chromium needs HTTP, not file paths)
       const renderConfig = {
         ...config,
         slides: config.slides.map((s: any) => ({
           ...s,
           imageUrl: s.imageUrl?.startsWith("/uploads/")
-            ? join(process.cwd(), "public", s.imageUrl)
+            ? `http://localhost:${API_PORT}${s.imageUrl}`
             : s.imageUrl,
         })),
       };
@@ -299,14 +300,14 @@ export async function motionRoutes(app: FastifyInstance) {
       }
       // default is square (1080x1080)
 
-      // Step 2: Render video — convert web URLs to file paths for Remotion
+      // Step 2: Render video — use HTTP URLs for Remotion (headless Chromium needs HTTP, not file paths)
       const renderConfig2 = {
         ...config,
         slides: config.slides.map((s: any) => ({
           ...s,
-          imageUrl: s.imageFilePath || (s.imageUrl?.startsWith("/uploads/")
-            ? join(process.cwd(), "public", s.imageUrl)
-            : s.imageUrl),
+          imageUrl: s.imageUrl?.startsWith("/uploads/")
+            ? `http://localhost:${API_PORT}${s.imageUrl}`
+            : s.imageUrl,
         })),
       };
       const filename = `motion-${Date.now()}.${config.outputFormat}`;
