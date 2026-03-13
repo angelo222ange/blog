@@ -98,13 +98,67 @@ export class JsonIndividualAdapter implements SiteAdapter {
       ? `/${webImageDir}/${article.images[0].filename}`
       : "";
 
+    const authorName = siteConfig.name || this.site.name;
+    const fullDomain = siteConfig.domain ? `https://${siteConfig.domain.replace(/^https?:\/\//, "")}` : "";
+    const fullImageUrl = heroImagePath && fullDomain ? `${fullDomain}${heroImagePath}` : heroImagePath;
+    const articleUrl = fullDomain ? `${fullDomain}${this.site.blogBasePath}/${article.slug}` : "";
+
+    // Build JSON-LD schemas for SEO
+    const jsonld: Record<string, any> = {};
+
+    // Article schema (always)
+    jsonld.article = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: article.metaTitle || article.title,
+      description: article.metaDescription,
+      image: fullImageUrl || undefined,
+      datePublished: article.date,
+      dateModified: article.date,
+      author: { "@type": "Organization", name: authorName },
+      publisher: { "@type": "Organization", name: authorName },
+      mainEntityOfPage: articleUrl || undefined,
+      keywords: article.keywords.join(", "),
+    };
+
+    // FAQ schema (if article has FAQ)
+    if (article.faq?.length) {
+      jsonld.faq = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: article.faq.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: { "@type": "Answer", text: item.answer },
+        })),
+      };
+    }
+
+    // LocalBusiness schema (for local service sites)
+    if (siteConfig.theme === "LOCAL_SERVICE" && siteConfig.city) {
+      jsonld.localBusiness = {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        name: authorName,
+        url: fullDomain || undefined,
+        telephone: siteConfig.phone || undefined,
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: siteConfig.city,
+          addressRegion: siteConfig.department || undefined,
+          addressCountry: "FR",
+        },
+        areaServed: { "@type": "City", name: siteConfig.city },
+      };
+    }
+
     const articleJson = {
       slug: article.slug,
       title: article.title,
       metaTitle: article.metaTitle,
       metaDescription: article.metaDescription,
       date: article.date,
-      author: siteConfig.name || this.site.name,
+      author: authorName,
       category: article.category,
       readTime: article.readTime,
       image: heroImagePath,
@@ -114,6 +168,7 @@ export class JsonIndividualAdapter implements SiteAdapter {
       sections: article.sections,
       faq: article.faq,
       conclusion: article.conclusion,
+      jsonld,
     };
 
     const articleFile: FileWrite = {
