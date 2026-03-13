@@ -1779,11 +1779,8 @@ export default function SocialPage() {
                   <button
                     key={t.id}
                     onClick={() => setSelectedTemplate(t.id === selectedTemplate ? "" : t.id)}
-                    className={`card hover-lift relative p-3 text-left transition-all ${
-                      selectedTemplate === t.id
-                        ? "border-2 border-blue-500 shadow-md"
-                        : ""
-                    }`}
+                    className="card hover-lift relative p-3 text-left transition-all"
+                    style={selectedTemplate === t.id ? { border: "2px solid #3b82f6", boxShadow: "0 4px 12px rgba(59,130,246,0.3)" } : {}}
                   >
                     <div className="w-full h-1 rounded-full mb-2" style={{ backgroundColor: t.previewColor }} />
                     <div className="text-xs font-bold text-gray-900">{t.name}</div>
