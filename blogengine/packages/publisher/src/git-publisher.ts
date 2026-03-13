@@ -208,6 +208,10 @@ export class GitPublisher {
 
       const repoGit = simpleGit(workDir).env(envVars);
 
+      // Set git identity for commits
+      await repoGit.addConfig("user.email", "deploy@zuply.fr");
+      await repoGit.addConfig("user.name", "Zuply");
+
       // ── Step 2: Duplicate check - verify slug doesn't exist ──
       const indexPath = path.join(workDir, site.contentDir, "articles.json");
       if (existsSync(indexPath)) {
