@@ -73,10 +73,11 @@ async function resolveSlideImages(slides: MotionSlide[]): Promise<MotionSlide[]>
 
         console.log(`[motion] Slide ${i} image: ${filename} (${(buffer.length / 1024).toFixed(0)} Ko)`);
 
-        // Use absolute file path for Remotion rendering (it can't access relative URLs)
+        // Return both: absolute path for Remotion rendering, web URL for frontend preview
         return {
           ...slide,
-          imageUrl: filepath,
+          imageUrl: `/uploads/motion-images/${filename}`,
+          imageFilePath: filepath,
         };
       } catch (err: any) {
         console.log(`[motion] Slide ${i} image failed: ${err.message}`);
@@ -186,9 +187,19 @@ export async function motionRoutes(app: FastifyInstance) {
     }
 
     try {
+      // Convert web URLs to absolute file paths for Remotion rendering
+      const renderConfig = {
+        ...config,
+        slides: config.slides.map((s: any) => ({
+          ...s,
+          imageUrl: s.imageFilePath || (s.imageUrl?.startsWith("/uploads/")
+            ? join(process.cwd(), "public", s.imageUrl)
+            : s.imageUrl),
+        })),
+      };
       const filename = `motion-${Date.now()}.${config.outputFormat || "mp4"}`;
       const result = await renderMotionVideo({
-        config,
+        config: renderConfig,
         outputDir: UPLOADS_DIR,
         filename,
       });
@@ -279,10 +290,19 @@ export async function motionRoutes(app: FastifyInstance) {
       }
       // default is square (1080x1080)
 
-      // Step 2: Render video
+      // Step 2: Render video — convert web URLs to file paths for Remotion
+      const renderConfig2 = {
+        ...config,
+        slides: config.slides.map((s: any) => ({
+          ...s,
+          imageUrl: s.imageFilePath || (s.imageUrl?.startsWith("/uploads/")
+            ? join(process.cwd(), "public", s.imageUrl)
+            : s.imageUrl),
+        })),
+      };
       const filename = `motion-${Date.now()}.${config.outputFormat}`;
       const result = await renderMotionVideo({
-        config,
+        config: renderConfig2,
         outputDir: UPLOADS_DIR,
         filename,
       });
