@@ -3,9 +3,10 @@
 /** Sanitize image URLs: convert absolute server paths to web-relative paths */
 function sanitizeImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  // Detect absolute server paths like /home/ubuntu/.../public/uploads/...
+  // Detect absolute server paths embedded in URLs
+  // Handles both "/home/ubuntu/.../uploads/..." and "http://host/home/ubuntu/.../uploads/..."
   const uploadsIdx = url.indexOf("/uploads/");
-  if (uploadsIdx > 0 && !url.startsWith("http") && !url.startsWith("/uploads/")) {
+  if (uploadsIdx > 0 && !url.startsWith("/uploads/")) {
     return url.slice(uploadsIdx);
   }
   return url;
