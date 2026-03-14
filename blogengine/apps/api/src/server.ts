@@ -21,6 +21,7 @@ import { socialPostsRoutes } from "./routes/social-posts.js";
 import { statsRoutes } from "./routes/stats.js";
 import { motionRoutes } from "./routes/motion.js";
 import { publishRoutes } from "./routes/publish.js";
+import { notifyRoutes } from "./routes/notify.js";
 import { startScheduler } from "@blogengine/scheduler";
 
 const app = Fastify({
@@ -58,6 +59,7 @@ async function start() {
   await app.register(statsRoutes, { prefix: "/api/stats" });
   await app.register(motionRoutes, { prefix: "/api/motion" });
   await app.register(publishRoutes, { prefix: "/api/publish" });
+  await app.register(notifyRoutes, { prefix: "/api/notify" });
 
   // Serve uploaded images (AI-generated social post images)
   await app.register(fastifyStatic, {

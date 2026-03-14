@@ -7,6 +7,54 @@ import { useAuth } from "../../../lib/use-auth";
 import NavbarDropdown from "../../../components/NavbarDropdown";
 import { getSite, generateArticle, getSchedule, updateSchedule, getPublishConfig, updatePublishConfig } from "../../../lib/api";
 
+// ─── Daily Quota Ring ───
+
+function DailyQuotaRing({ used, max }: { used: number; max: number }) {
+  const size = 48;
+  const strokeWidth = 5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = max > 0 ? Math.min(used / max, 1) : 0;
+  const dashLen = pct * circumference;
+  const isFull = used >= max;
+  const strokeColor = isFull ? "#ef4444" : "#3b82f6";
+  const trackColor = isFull ? "#fecaca" : "#e5e7eb";
+
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="relative shrink-0">
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke={trackColor} strokeWidth={strokeWidth}
+          />
+          {pct > 0 && (
+            <circle
+              cx={size / 2} cy={size / 2} r={radius}
+              fill="none" stroke={strokeColor} strokeWidth={strokeWidth}
+              strokeDasharray={`${dashLen} ${circumference - dashLen}`}
+              strokeLinecap="round"
+            />
+          )}
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`text-[10px] font-bold tabular-nums ${isFull ? "text-red-500" : "text-gray-900"}`}>
+            {used}/{max}
+          </span>
+        </div>
+      </div>
+      <div className="min-w-0">
+        <p className={`text-[10px] font-semibold leading-tight ${isFull ? "text-red-500" : "text-gray-600"}`}>
+          {isFull ? "Quota atteint" : "Quota du jour"}
+        </p>
+        <p className="text-[9px] text-gray-400 font-medium leading-tight mt-0.5">
+          {isFull ? "Reprise demain" : `${max - used} restant${max - used > 1 ? "s" : ""}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const BADGE_MAP: Record<string, string> = {
   REVIEW: "badge-review", APPROVED: "badge-approved", PUBLISHED: "badge-published",
   REJECTED: "badge-rejected", DRAFT: "badge-draft", PUBLISHING: "badge-publishing", FAILED: "badge-failed",
@@ -513,6 +561,8 @@ export default function SiteDetailPage() {
   const [showTopicInput, setShowTopicInput] = useState(false);
   const [genError, setGenError] = useState("");
   const [githubMsg, setGithubMsg] = useState("");
+  const [quotaUsed, setQuotaUsed] = useState(0);
+  const [quotaMax, setQuotaMax] = useState(4);
 
   useEffect(() => {
     if (searchParams.get("github") === "connected") {
@@ -532,14 +582,23 @@ export default function SiteDetailPage() {
       .then((data) => { setSite(data); setArticles(Array.isArray(data.articles) ? data.articles : []); })
       .catch(console.error)
       .finally(() => setLoading(false));
+    getSchedule(id)
+      .then((sched: any) => {
+        setQuotaUsed(sched.articlesGeneratedToday ?? 0);
+        setQuotaMax(sched.evergreenPerDay ?? 4);
+      })
+      .catch(() => {});
   }, [user, id]);
 
+  const quotaFull = quotaUsed >= quotaMax;
+
   const handleGenerate = async () => {
-    if (!site) return;
+    if (!site || quotaFull) return;
     setGenerating(true); setGenError("");
     try {
       const newArticle = await generateArticle(site.id, topicHint || undefined);
       setArticles((prev) => [newArticle, ...prev]);
+      setQuotaUsed((prev) => prev + 1);
       setTopicHint(""); setShowTopicInput(false);
     } catch (err: any) { setGenError(err.message || "Erreur de generation"); }
     finally { setGenerating(false); }
@@ -593,17 +652,18 @@ export default function SiteDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <DailyQuotaRing used={quotaUsed} max={quotaMax} />
             {showTopicInput && (
               <input type="text" value={topicHint} onChange={(e) => setTopicHint(e.target.value)}
                 placeholder="Sujet (optionnel)" className="input w-full md:w-56"
                 onKeyDown={(e) => e.key === "Enter" && handleGenerate()} />
             )}
-            {!showTopicInput && (
+            {!showTopicInput && !quotaFull && (
               <button onClick={() => setShowTopicInput(true)} className="text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors">+ sujet</button>
             )}
-            <button onClick={handleGenerate} disabled={generating} className="btn-primary px-4 md:px-5 py-2.5 text-xs md:text-sm flex items-center gap-2 whitespace-nowrap">
+            <button onClick={handleGenerate} disabled={generating || quotaFull} className={`px-4 md:px-5 py-2.5 text-xs md:text-sm flex items-center gap-2 whitespace-nowrap rounded-xl font-semibold transition-all ${quotaFull ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "btn-primary"}`}>
               {generating && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              {generating ? "Generation..." : "Generer un article"}
+              {quotaFull ? `Quota quotidien atteint (${quotaUsed}/${quotaMax})` : generating ? "Generation..." : "Generer un article"}
             </button>
           </div>
         </div>

@@ -199,6 +199,49 @@ export function formatDeployError(
   };
 }
 
+export function formatGenerateError(
+  siteName: string,
+  error: string
+): { subject: string; body: string; html: string } {
+  const content = `
+    <p>La generation d'article a echoue pour <strong>${siteName}</strong>.</p>
+    ${infoTable([
+      ["Site", siteName],
+      ["Erreur", `<span style="color:#dc2626;">${error}</span>`],
+      ["Statut", statusPill("Echec", "#dc2626", "#fef2f2")],
+      ["Date", new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })],
+    ])}
+    <p style="margin-top:12px;font-size:13px;color:#64748b;">Verifiez la configuration OpenAI et les parametres du site.</p>
+  `;
+
+  return {
+    subject: `[Zuply] Erreur generation - ${siteName}`,
+    body: `Generation echouee pour "${siteName}"\nErreur: ${error}\n-- Zuply`,
+    html: emailLayout("Generation echouee", content),
+  };
+}
+
+export function formatSocialGenerateError(
+  siteName: string,
+  error: string
+): { subject: string; body: string; html: string } {
+  const content = `
+    <p>La generation des posts sociaux a echoue pour <strong>${siteName}</strong>.</p>
+    ${infoTable([
+      ["Site", siteName],
+      ["Erreur", `<span style="color:#dc2626;">${error}</span>`],
+      ["Statut", statusPill("Echec", "#dc2626", "#fef2f2")],
+      ["Date", new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })],
+    ])}
+  `;
+
+  return {
+    subject: `[Zuply] Erreur posts sociaux - ${siteName}`,
+    body: `Generation posts sociaux echouee pour "${siteName}"\nErreur: ${error}\n-- Zuply`,
+    html: emailLayout("Echec generation posts sociaux", content),
+  };
+}
+
 export function formatGenerateSuccess(
   siteName: string,
   articleTitle: string,

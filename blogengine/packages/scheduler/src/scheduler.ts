@@ -17,6 +17,34 @@ let task: cron.ScheduledTask | null = null;
 let apiPort = 4000;
 let authToken = "";
 
+/**
+ * Send an error notification email via the API's internal notify endpoint.
+ * Used when the API route itself wasn't reached (network/timeout errors)
+ * or when the route doesn't handle notifications (e.g. social generation).
+ */
+async function sendErrorNotification(
+  siteId: string,
+  pipeline: "generate" | "publish" | "deploy" | "social",
+  error: string
+): Promise<void> {
+  try {
+    const schedulerSecret = process.env.SCHEDULER_SECRET;
+    if (!schedulerSecret) return;
+
+    await fetch(`http://localhost:${apiPort}/api/notify/error`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Scheduler-Secret": schedulerSecret,
+      },
+      body: JSON.stringify({ siteId, pipeline, error }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (notifyErr: any) {
+    console.error(`[scheduler] Failed to send error notification: ${notifyErr.message}`);
+  }
+}
+
 // Day mapping: JS getDay() returns 0=Sunday, we use 1=Monday...7=Sunday
 function jsDayToScheduleDay(jsDay: number): number {
   return jsDay === 0 ? 7 : jsDay;
@@ -85,6 +113,11 @@ async function triggerGeneration(siteId: string, siteName: string, imageSource?:
     if (!res.ok) {
       const err = await res.text().catch(() => "unknown");
       console.error(`[scheduler] Generation failed for ${siteName}: ${err.slice(0, 200)}`);
+      // The API generate route now sends error emails itself on 500,
+      // but for other status codes (400, 404), notify from here
+      if (res.status !== 500) {
+        await sendErrorNotification(siteId, "generate", `HTTP ${res.status}: ${err.slice(0, 200)}`);
+      }
       return null;
     }
 
@@ -93,6 +126,8 @@ async function triggerGeneration(siteId: string, siteName: string, imageSource?:
     return data.id || null;
   } catch (err: any) {
     console.error(`[scheduler] Error generating for ${siteName}: ${err.message}`);
+    // Network/timeout errors — API was never reached, so notify from scheduler
+    await sendErrorNotification(siteId, "generate", err.message);
     return null;
   }
 }
@@ -112,6 +147,11 @@ async function triggerPublishPipeline(siteId: string, articleId: string): Promis
     if (!pubRes.ok) {
       const err = await pubRes.text().catch(() => "unknown");
       console.error(`[scheduler] Publish failed: ${err.slice(0, 200)}`);
+      // The publish route already sends error emails on 500,
+      // but notify for other status codes
+      if (pubRes.status !== 500) {
+        await sendErrorNotification(siteId, "publish", `Publish HTTP ${pubRes.status}: ${err.slice(0, 200)}`);
+      }
       return false;
     }
 
@@ -126,6 +166,10 @@ async function triggerPublishPipeline(siteId: string, articleId: string): Promis
     if (!deployRes.ok) {
       const err = await deployRes.text().catch(() => "unknown");
       console.error(`[scheduler] Deploy failed: ${err.slice(0, 200)}`);
+      // The deploy route already sends error emails on 500
+      if (deployRes.status !== 500) {
+        await sendErrorNotification(siteId, "deploy", `Deploy HTTP ${deployRes.status}: ${err.slice(0, 200)}`);
+      }
       return false;
     }
 
@@ -133,11 +177,13 @@ async function triggerPublishPipeline(siteId: string, articleId: string): Promis
     return true;
   } catch (err: any) {
     console.error(`[scheduler] Publish pipeline error: ${err.message}`);
+    // Network/timeout errors — API never reached
+    await sendErrorNotification(siteId, "publish", err.message);
     return false;
   }
 }
 
-async function triggerSocialPipeline(articleId: string): Promise<void> {
+async function triggerSocialPipeline(siteId: string, articleId: string): Promise<void> {
   try {
     const token = await getAuthToken();
 
@@ -152,12 +198,14 @@ async function triggerSocialPipeline(articleId: string): Promise<void> {
     if (!res.ok) {
       const err = await res.text().catch(() => "unknown");
       console.error(`[scheduler] Social generation failed: ${err.slice(0, 200)}`);
+      await sendErrorNotification(siteId, "social", `Social generation HTTP ${res.status}: ${err.slice(0, 200)}`);
       return;
     }
 
     console.log(`[scheduler] Social posts generated for article ${articleId}`);
   } catch (err: any) {
     console.error(`[scheduler] Social pipeline error: ${err.message}`);
+    await sendErrorNotification(siteId, "social", err.message);
   }
 }
 
@@ -284,7 +332,7 @@ async function checkSchedules(): Promise<void> {
         // If autoApprove is on, trigger publish + deploy + social
         if (schedData.autoApprove) {
           await triggerPublishPipeline(site.id, articleId);
-          await triggerSocialPipeline(articleId);
+          await triggerSocialPipeline(site.id, articleId);
         }
 
         // Update schedule tracking

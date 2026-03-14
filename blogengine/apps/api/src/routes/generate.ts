@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { authGuard } from "../lib/auth.js";
 import { generateArticleForSite } from "@blogengine/generator";
 import { createAdapter } from "@blogengine/adapters";
-import { sendErrorNotification } from "../lib/notify.js";
+import { sendErrorNotification, formatGenerateError } from "../lib/notify.js";
 
 export async function generateRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authGuard);
@@ -137,6 +137,12 @@ export async function generateRoutes(app: FastifyInstance) {
           completedAt: new Date(),
         },
       });
+
+      // Send error email if configured
+      if (site.notifyEmail) {
+        const emailData = formatGenerateError(site.name, error.message);
+        sendErrorNotification({ to: site.notifyEmail, ...emailData }).catch(() => {});
+      }
 
       return reply.status(500).send({ error: "Erreur de generation", details: error.message });
     }
