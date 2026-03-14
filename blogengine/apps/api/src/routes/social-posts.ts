@@ -1,7 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import type { SocialPlatform } from "@blogengine/core";
 import { generateSocialPostsSchema, updateSocialPostSchema } from "@blogengine/core";
-import { generateSocialPosts, getPlatformClient, decrypt, fetchMetrics, crawlNicheTrends, getNicheTrendsForSite } from "@blogengine/social";
+import { generateSocialPosts, getPlatformClient, decrypt, fetchMetrics } from "@blogengine/social";
+
+// Lazy-load trend functions (optional — API starts even if trend module fails)
+async function loadTrendFunctions() {
+  try {
+    const mod = await import("@blogengine/social");
+    return {
+      crawlNicheTrends: (mod as any).crawlNicheTrends as typeof import("@blogengine/social").crawlNicheTrends | undefined,
+      getNicheTrendsForSite: (mod as any).getNicheTrendsForSite as typeof import("@blogengine/social").getNicheTrendsForSite | undefined,
+    };
+  } catch {
+    console.log("[social] Trend crawler not available — skipping");
+    return { crawlNicheTrends: undefined, getNicheTrendsForSite: undefined };
+  }
+}
 import type { ArticleForSocial, TopPerformerData, NicheTrendData } from "@blogengine/social";
 import { prisma } from "../lib/prisma.js";
 import { authGuard } from "../lib/auth.js";
@@ -397,8 +411,9 @@ export async function socialPostsRoutes(app: FastifyInstance) {
       });
       if (!site) return reply.status(404).send({ error: "Site introuvable" });
 
-      const result = await crawlNicheTrends(prisma, site.id, site.name, site.theme, site.city);
-      return result;
+      const { crawlNicheTrends } = await loadTrendFunctions();
+      if (!crawlNicheTrends) return reply.status(501).send({ error: "Trend crawler not available" });
+      return await crawlNicheTrends(prisma, site.id, site.name, site.theme, site.city);
     },
   );
 
@@ -406,8 +421,9 @@ export async function socialPostsRoutes(app: FastifyInstance) {
   app.get<{ Params: { siteId: string } }>(
     "/niche-trends/:siteId",
     async (request, reply) => {
-      const trends = await getNicheTrendsForSite(prisma, request.params.siteId);
-      return trends;
+      const { getNicheTrendsForSite } = await loadTrendFunctions();
+      if (!getNicheTrendsForSite) return [];
+      return await getNicheTrendsForSite(prisma, request.params.siteId);
     },
   );
 
@@ -475,8 +491,12 @@ export async function socialPostsRoutes(app: FastifyInstance) {
       // Fetch top performers for AI optimization
       const topPerformers = await getTopPerformers(article.siteId);
 
-      // Fetch niche trends
-      const nicheTrends = await getNicheTrendsForSite(prisma, article.siteId);
+      // Fetch niche trends (optional)
+      let nicheTrends: NicheTrendData[] = [];
+      try {
+        const { getNicheTrendsForSite } = await loadTrendFunctions();
+        if (getNicheTrendsForSite) nicheTrends = await getNicheTrendsForSite(prisma, article.siteId);
+      } catch {}
 
       // Generate posts via LLM
       const apiKey = process.env.OPENAI_API_KEY || "";
@@ -587,8 +607,12 @@ export async function socialPostsRoutes(app: FastifyInstance) {
       // Fetch top performers for AI optimization
       const topPerformers = await getTopPerformers(site.id);
 
-      // Fetch niche trends
-      const nicheTrends = await getNicheTrendsForSite(prisma, site.id);
+      // Fetch niche trends (optional)
+      let nicheTrends: NicheTrendData[] = [];
+      try {
+        const { getNicheTrendsForSite } = await loadTrendFunctions();
+        if (getNicheTrendsForSite) nicheTrends = await getNicheTrendsForSite(prisma, site.id);
+      } catch {}
 
       const apiKey = process.env.OPENAI_API_KEY || "";
       const generatedPosts = await generateSocialPosts(articleForSocial, platforms, apiKey, { carousel: isCarousel, topPerformers: topPerformers.length > 0 ? topPerformers : undefined, nicheTrends: nicheTrends.length > 0 ? nicheTrends : undefined });
