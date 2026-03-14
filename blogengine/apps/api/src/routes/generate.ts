@@ -69,6 +69,7 @@ export async function generateRoutes(app: FastifyInstance) {
         topicHint: parsed.data.topicHint,
         apiKey: process.env.OPENAI_API_KEY || "",
         usedImageUrls,
+        imageSource: parsed.data.imageSource,
       });
 
       // Store image buffers as base64 in DB so the publisher can write them later

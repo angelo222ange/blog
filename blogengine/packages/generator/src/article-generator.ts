@@ -28,6 +28,7 @@ interface GenerateOptions {
   apiKey: string;
   existingArticles?: ExistingArticle[];
   usedImageUrls?: string[];
+  imageSource?: "auto" | "ai" | "pexels" | "wikimedia";
 }
 
 export async function generateArticleForSite(
@@ -279,7 +280,7 @@ Reponds UNIQUEMENT avec le nouveau contenu de la section (texte brut avec <stron
       article.keywords || [],
       article.slug,
       site.city,
-      "auto",
+      options.imageSource || "ai",
       options.usedImageUrls || [],
     );
     if (heroImage) {

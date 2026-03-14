@@ -24,41 +24,48 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [autoApprove, setAutoApprove] = useState(false);
-  const [postTime, setPostTime] = useState("09:00");
+  const [postSlots, setPostSlots] = useState<string[]>(["09:00"]);
+  const [slotImageModes, setSlotImageModes] = useState<string[]>(["ai"]);
   const [activeDays, setActiveDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [evergreenPerDay, setEvergreenPerDay] = useState(1);
   const [newsPerWeek, setNewsPerWeek] = useState(3);
-  const [dayTimes, setDayTimes] = useState<Record<string, string>>({});
-  const [perDayMode, setPerDayMode] = useState(false);
 
   useEffect(() => {
     getSchedule(siteId)
       .then((data) => {
         setAutoApprove(data.autoApprove ?? false);
-        setPostTime(data.postTime ?? "09:00");
-        setActiveDays(data.activeDays ?? [1, 2, 3, 4, 5]);
-        setEvergreenPerDay(data.evergreenPerDay ?? 1);
-        setNewsPerWeek(data.newsPerWeek ?? 3);
+        // Parse postTime (comma-separated) into slots
+        const times = (data.postTime ?? "09:00").split(",").map((t: string) => t.trim()).filter(Boolean);
+        setPostSlots(times.length > 0 ? times : ["09:00"]);
+        // Parse slotImageModes from dayTimes.__modes or default to "ai"
         const dt = data.dayTimes ?? {};
-        setDayTimes(dt);
-        setPerDayMode(Object.keys(dt).length > 0);
+        const modes = dt.__modes ? JSON.parse(dt.__modes) : times.map(() => "ai");
+        setSlotImageModes(modes);
+        setActiveDays(data.activeDays ?? [1, 2, 3, 4, 5]);
+        setNewsPerWeek(data.newsPerWeek ?? 3);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [siteId]);
 
+  const evergreenPerDay = postSlots.length;
+
   const handleSave = useCallback(async () => {
     setSaving(true); setSaved(false);
     try {
       await updateSchedule(siteId, {
-        postTime, activeDays, evergreenPerDay, newsPerWeek, autoApprove,
-        isActive: true, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        dayTimes: perDayMode ? dayTimes : {},
+        postTime: postSlots.join(","),
+        activeDays,
+        evergreenPerDay,
+        newsPerWeek,
+        autoApprove,
+        isActive: true,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        dayTimes: { __modes: JSON.stringify(slotImageModes) },
       });
       setSaved(true); setTimeout(() => setSaved(false), 2500);
     } catch (err: any) { alert(err.message || "Erreur"); }
     finally { setSaving(false); }
-  }, [siteId, postTime, activeDays, evergreenPerDay, newsPerWeek, autoApprove, dayTimes, perDayMode]);
+  }, [siteId, postSlots, activeDays, evergreenPerDay, newsPerWeek, autoApprove, slotImageModes]);
 
   const toggleDay = (day: number) => {
     setActiveDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort());
@@ -109,36 +116,118 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
       {autoApprove && (
         <div className="bg-white/40 rounded-xl border border-white/50 p-5 space-y-5 animate-fade-in">
           <p className="text-sm font-bold text-gray-900">Configuration du planning</p>
+
+          {/* Articles per day */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Heure de publication</label>
-            <input type="time" value={postTime} onChange={(e) => setPostTime(e.target.value)} className="input w-auto" />
-            <label className="flex items-center gap-2 mt-3 cursor-pointer">
-              <input type="checkbox" checked={perDayMode} onChange={(e) => setPerDayMode(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span className="text-xs text-gray-600 font-medium">Heure differente par jour</span>
+            <label className="block text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wider">
+              Nombre d'articles par jour
             </label>
-          </div>
-          {perDayMode && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wider">Heures par jour</label>
-              <div className="space-y-2">
-                {activeDays.sort((a, b) => a - b).map((dayNum) => (
-                  <div key={dayNum} className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-gray-700 w-10">{DAY_LABELS[dayNum - 1]}</span>
-                    <input
-                      type="time"
-                      value={dayTimes[String(dayNum)] || postTime}
-                      onChange={(e) => setDayTimes((prev) => ({ ...prev, [String(dayNum)]: e.target.value }))}
-                      className="input w-auto"
-                    />
-                  </div>
-                ))}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  if (postSlots.length <= 1) return;
+                  setPostSlots(postSlots.slice(0, -1));
+                  setSlotImageModes(slotImageModes.slice(0, -1));
+                }}
+                disabled={postSlots.length <= 1}
+                className="w-10 h-10 rounded-xl bg-white/60 border border-gray-200/50 text-gray-600 hover:bg-white/80 hover:border-gray-300 flex items-center justify-center transition-all text-lg font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                -
+              </button>
+              <div className="w-16 h-10 rounded-xl bg-white/70 border border-blue-200 flex items-center justify-center">
+                <span className="text-lg font-extrabold text-blue-600">{postSlots.length}</span>
               </div>
+              <button
+                onClick={() => {
+                  const last = postSlots[postSlots.length - 1] || "10:00";
+                  const [h, m] = last.split(":").map(Number);
+                  const nextH = Math.min((h || 0) + 2, 23);
+                  setPostSlots([...postSlots, `${String(nextH).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`]);
+                  setSlotImageModes([...slotImageModes, "ai"]);
+                }}
+                disabled={postSlots.length >= 10}
+                className="w-10 h-10 rounded-xl bg-white/60 border border-gray-200/50 text-gray-600 hover:bg-white/80 hover:border-gray-300 flex items-center justify-center transition-all text-lg font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                +
+              </button>
+              <span className="text-xs text-gray-500 font-medium ml-1">article{postSlots.length > 1 ? "s" : ""} / jour</span>
             </div>
-          )}
+            <p className="text-[11px] text-gray-400 mt-2">
+              Chaque article correspond a un creneau horaire. Augmentez pour ajouter des creneaux.
+            </p>
+          </div>
+
+          {/* Time slots with image mode */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wider">
+              Creneaux de publication
+            </label>
+            <div className="space-y-2">
+              {postSlots.map((slot, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-gray-400 w-6 shrink-0">{idx + 1}.</span>
+                  <input
+                    type="time"
+                    value={slot}
+                    onChange={(e) => {
+                      const next = [...postSlots];
+                      next[idx] = e.target.value;
+                      setPostSlots(next);
+                    }}
+                    className="flex-1 px-3 py-2 rounded-xl border border-gray-200/60 bg-white/70 text-sm font-medium text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  />
+                  {/* Image mode toggle: Stock / IA */}
+                  <div className="flex bg-gray-100/80 rounded-lg p-0.5 gap-0.5">
+                    <button
+                      onClick={() => {
+                        const next = [...slotImageModes];
+                        next[idx] = "stock";
+                        setSlotImageModes(next);
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${
+                        (slotImageModes[idx] || "ai") === "stock" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                      }`}
+                    >
+                      Stock
+                    </button>
+                    <button
+                      onClick={() => {
+                        const next = [...slotImageModes];
+                        next[idx] = "ai";
+                        setSlotImageModes(next);
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${
+                        (slotImageModes[idx] || "ai") === "ai" ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm" : "text-gray-400 hover:text-gray-600"
+                      }`}
+                    >
+                      IA
+                    </button>
+                  </div>
+                  {postSlots.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setPostSlots(postSlots.filter((_, i) => i !== idx));
+                        setSlotImageModes(slotImageModes.filter((_, i) => i !== idx));
+                      }}
+                      className="w-8 h-8 rounded-xl border border-gray-200/50 text-gray-400 hover:text-red-500 hover:border-red-200 flex items-center justify-center transition-colors shrink-0"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2">
+              {postSlots.length} creneau{postSlots.length > 1 ? "x" : ""} configure{postSlots.length > 1 ? "s" : ""}. Stock = image Pexels/Unsplash, IA = image generee par Gemini.
+            </p>
+          </div>
+
+          {/* Active days */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wider">Jours actifs</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               {DAY_LABELS.map((label, i) => {
                 const dayNum = i + 1;
                 const active = activeDays.includes(dayNum);
@@ -152,15 +241,39 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
               })}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Articles / jour</label>
-              <input type="number" min={0} max={10} value={evergreenPerDay} onChange={(e) => setEvergreenPerDay(parseInt(e.target.value) || 0)} className="input" />
+
+          {/* Weekly overview */}
+          <div className="p-3 sm:p-4 bg-white/50 rounded-xl border border-gray-200/30">
+            <p className="text-xs font-bold text-gray-700 mb-3">Ma semaine type</p>
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+              {DAY_LABELS.map((label, i) => {
+                const dayNum = i + 1;
+                const active = activeDays.includes(dayNum);
+                return (
+                  <div key={dayNum} className={`text-center rounded-lg py-2 px-1 transition-all ${
+                    active ? "bg-white border border-gray-200/50 shadow-sm" : "bg-gray-50/50 opacity-30"
+                  }`}>
+                    <p className={`text-[10px] font-bold mb-1 ${active ? "text-gray-900" : "text-gray-400"}`}>{label}</p>
+                    {active && postSlots.map((slot, si) => (
+                      <div key={si} className="mb-0.5">
+                        <span className="text-[8px] text-gray-400 font-medium">{slot}</span>
+                        <span className={`block text-[8px] font-bold px-1 py-0.5 rounded mx-auto ${
+                          (slotImageModes[si] || "ai") === "ai" ? "text-purple-600 bg-purple-50" : "text-gray-600 bg-gray-50"
+                        }`}>
+                          {(slotImageModes[si] || "ai") === "ai" ? "IA" : "Stock"}
+                        </span>
+                      </div>
+                    ))}
+                    {!active && <p className="text-[9px] text-gray-300 font-medium">OFF</p>}
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">News / semaine</label>
-              <input type="number" min={0} max={50} value={newsPerWeek} onChange={(e) => setNewsPerWeek(parseInt(e.target.value) || 0)} className="input" />
-            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">News / semaine</label>
+            <input type="number" min={0} max={50} value={newsPerWeek} onChange={(e) => setNewsPerWeek(parseInt(e.target.value) || 0)} className="input w-32" />
           </div>
         </div>
       )}

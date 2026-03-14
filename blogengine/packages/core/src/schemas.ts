@@ -72,6 +72,7 @@ export const loginSchema = z.object({
 export const generateArticleSchema = z.object({
   siteId: z.string().min(1),
   topicHint: z.string().optional(),
+  imageSource: z.enum(["auto", "ai", "pexels", "wikimedia"]).optional(),
 });
 
 // ─── Social Media Schemas ───
