@@ -152,22 +152,39 @@ export class JsonIndividualAdapter implements SiteAdapter {
       };
     }
 
+    // Map sections to the format expected by the site templates:
+    // Site expects { h2, content } — generator produces { title, content }
+    const mappedSections = (article.sections || []).map((s: any) => ({
+      h2: s.title || s.h2 || "",
+      content: s.content || "",
+    }));
+
     const articleJson = {
       slug: article.slug,
       title: article.title,
       metaTitle: article.metaTitle,
       metaDescription: article.metaDescription,
       date: article.date,
+      dateISO: article.date,
       author: authorName,
       category: article.category,
       readTime: article.readTime,
       image: heroImagePath,
       imageAlt: article.images[0]?.alt || "",
+      // Keep flat fields for backward compatibility
       intro: article.intro,
       tldr: article.tldr,
-      sections: article.sections,
+      sections: mappedSections,
       faq: article.faq,
       conclusion: article.conclusion,
+      // Add nested "content" object for sites that expect this format
+      content: {
+        introduction: article.intro || "",
+        sections: mappedSections,
+        table: { title: "", headers: [], rows: [] },
+        list: { title: "", items: [] },
+        conclusion: article.conclusion || "",
+      },
       jsonld,
     };
 
