@@ -95,7 +95,7 @@ function PublicationModeSection({ siteId }: { siteId: string }) {
       .finally(() => setLoading(false));
   }, [siteId]);
 
-  const evergreenPerDay = postSlots.length;
+  const evergreenPerDay = 4; // Fixed daily quota — independent from number of slots
 
   const handleSave = useCallback(async () => {
     setSaving(true); setSaved(false);
