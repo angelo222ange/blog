@@ -28,8 +28,31 @@ const DEPARTMENT_INFO: Record<string, { region: string; name: string; neighbors:
   "13": { region: "Provence-Alpes-Cote d'Azur", name: "Bouches-du-Rhone", neighbors: ["Aix-en-Provence", "Martigues", "Aubagne", "La Ciotat", "Salon-de-Provence"] },
 };
 
+// Derive the service type from site name for prompt context
+function deriveServiceType(siteName: string): { service: string; examples: { install: string; repair: string; price: string } } {
+  const name = siteName.toLowerCase();
+  if (name.includes("serrurier") || name.includes("serrurerie")) {
+    return { service: "serrurerie", examples: { install: "Installation Serrure", repair: "Depannage Serrure", price: "Prix Serrurier" } };
+  }
+  if (name.includes("plomb")) {
+    return { service: "plomberie", examples: { install: "Installation Plomberie", repair: "Depannage Plomberie", price: "Prix Plombier" } };
+  }
+  if (name.includes("electri")) {
+    return { service: "electricite", examples: { install: "Installation Electrique", repair: "Depannage Electricite", price: "Prix Electricien" } };
+  }
+  if (name.includes("demenag")) {
+    return { service: "demenagement", examples: { install: "Service Demenagement", repair: "Demenagement Urgent", price: "Prix Demenagement" } };
+  }
+  if (name.includes("nettoyage") || name.includes("clean")) {
+    return { service: "nettoyage", examples: { install: "Service Nettoyage", repair: "Nettoyage Urgent", price: "Prix Nettoyage" } };
+  }
+  // Default: rideau metallique / DRM
+  return { service: "rideau metallique", examples: { install: "Installation Rideau Metallique", repair: "Depannage Rideau Metallique", price: "Prix Rideau Metallique" } };
+}
+
 export function buildUserPrompt(ctx: PromptContext): string {
   const { site, existingArticles, sitePages, topicHint, newsContext, currentYear } = ctx;
+  const serviceInfo = deriveServiceType(site.name);
 
   const existingList = existingArticles.length > 0
     ? existingArticles
@@ -70,14 +93,14 @@ Ces pages existent deja sur le site et ciblent des requetes specifiques.
 Tu NE DOIS PAS creer un article de blog qui cible la meme requete principale qu'une page existante.
 
 Exemples de cannibalisation a EVITER :
-- Page existante : /installation-rideau-metallique -> NE PAS faire un article "Installation Rideau Metallique a ${site.city || "..."} en ${currentYear}"
-- Page existante : /depannage-rideau-metallique -> NE PAS faire un article "Depannage Rideau Metallique a ${site.city || "..."}"
-- Page existante : /prix-rideau-metallique -> NE PAS faire un article "Prix Rideau Metallique ${currentYear}"
+- Page existante : /installation -> NE PAS faire un article "${serviceInfo.examples.install} a ${site.city || "..."} en ${currentYear}"
+- Page existante : /depannage -> NE PAS faire un article "${serviceInfo.examples.repair} a ${site.city || "..."}"
+- Page existante : /prix -> NE PAS faire un article "${serviceInfo.examples.price} ${currentYear}"
 
 A la place, cible une SOUS-REQUETE ou un ANGLE DIFFERENT :
-- Page /installation existe -> article "Comment Preparer l'Installation de votre Rideau Metallique" ou "Les 5 Erreurs a Eviter lors de l'Installation"
-- Page /depannage existe -> article "Rideau Metallique Bloque : 7 Causes et Solutions Rapides"
-- Page /prix existe -> article "Comment Reduire le Cout de votre Rideau Metallique sans Sacrifier la Qualite"
+- Page /installation existe -> article "Comment Preparer votre ${serviceInfo.service}" ou "Les 5 Erreurs a Eviter"
+- Page /depannage existe -> article "Probleme de ${serviceInfo.service} : 7 Causes et Solutions Rapides"
+- Page /prix existe -> article "Comment Reduire le Cout de votre ${serviceInfo.service} sans Sacrifier la Qualite"
 
 Le but de l'article de blog est de capter du trafic sur des requetes LONGUE TRAINE (informationnelles, comparatives, probleme/solution) et de REDIRIGER ce trafic vers les pages commerciales via le maillage interne. L'article NE DOIT PAS concurrencer les pages existantes.`
     : `## MAILLAGE INTERNE

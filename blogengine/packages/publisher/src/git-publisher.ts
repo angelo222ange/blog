@@ -430,6 +430,7 @@ export class GitPublisher {
         "git pull origin main && yarn && yarn build",
         "git pull && npm run build",
         "./deploy.sh",
+        "./deploy.sh ${REPO_NAME}",
         "git pull origin main && npm install --legacy-peer-deps && npm run build && sudo rsync -a --delete out/ /var/www/${REPO_NAME}/ && sudo chown -R www-data:www-data /var/www/${REPO_NAME}",
       ];
 
