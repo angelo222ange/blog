@@ -197,8 +197,14 @@ async function triggerSocialPipeline(siteId: string, articleId: string): Promise
 
     if (!res.ok) {
       const err = await res.text().catch(() => "unknown");
-      console.error(`[scheduler] Social generation failed: ${err.slice(0, 200)}`);
-      await sendErrorNotification(siteId, "social", `Social generation HTTP ${res.status}: ${err.slice(0, 200)}`);
+      // Don't send error emails for "no social accounts" — it's expected
+      const isNoAccounts = err.includes("Aucun compte social") || err.includes("No social account");
+      if (isNoAccounts) {
+        console.log(`[scheduler] Social skipped: no accounts connected for site ${siteId}`);
+      } else {
+        console.error(`[scheduler] Social generation failed: ${err.slice(0, 200)}`);
+        await sendErrorNotification(siteId, "social", `Social generation HTTP ${res.status}: ${err.slice(0, 200)}`);
+      }
       return;
     }
 
